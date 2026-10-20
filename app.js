@@ -89,7 +89,7 @@ function renderNav() {
   const visibleItems = profile.role === "supervisor"
     ? navItems
     : navItems.filter(([id]) =>
-        !["attendance", "members"].includes(id)
+        !["attendance", "members", "guardians"].includes(id)
       );
 
   nav.innerHTML = visibleItems.map(([id, label, icon]) =>
