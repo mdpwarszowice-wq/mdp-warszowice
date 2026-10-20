@@ -418,6 +418,8 @@ function renderNav() {
 
        
         app.querySelectorAll("[data-delete-member]").forEach(button => {
+          alert("Kliknięto Usuń członka");
+          
           button.addEventListener("click", async () => {
             if (profile.role !== "supervisor") {
               return toast("Tylko opiekun może usunąć członka.");
