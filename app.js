@@ -416,62 +416,41 @@ function renderNav() {
           renderView();
         });
 
-        app.querySelectorAll("[data-edit-member]").forEach(button => {
-          button.addEventListener("click", () => {
-            const member = rows.find(m => m.id === button.dataset.editMember);
+       
+        app.querySelectorAll("[data-delete-member]").forEach(button => {
+          button.addEventListener("click", async () => {
+            if (profile.role !== "supervisor") {
+              return toast("Tylko opiekun może usunąć członka.");
+            }
+
+            const memberId = button.dataset.deleteMember;
+            const member = rows.find(m => m.id === memberId);
             if (!member) return;
 
-            const editor = document.getElementById(`member-edit-${member.id}`);
+            const confirmed = confirm(
+              `Czy na pewno chcesz usunąć członka: ${member.full_name}?`
+              + "\n\nUsunięcie może być niemożliwe, jeśli ma zapisane obecności lub przypisanego rodzica."
+            );
 
-            editor.innerHTML = `
-              <form class="member-edit-form">
-                <label>Imię i nazwisko
-                  <input name="full_name" required maxlength="160" value="${esc(member.full_name)}">
-                </label>
-                <label>Status
-                  <select name="active">
-                    <option value="true" ${member.active ? "selected" : ""}>Aktywny</option>
-                    <option value="false" ${!member.active ? "selected" : ""}>Nieaktywny</option>
-                  </select>
-                </label>
-                <button class="primary" type="submit">Zapisz zmiany</button>
-                <button class="secondary cancel-member-edit" type="button">Anuluj</button>
-              </form>
-            `;
+            if (!confirmed) return;
 
-            const editForm = editor.querySelector("form");
+            const { error } = await supabaseClient
+              .from("members")
+              .delete()
+              .eq("id", memberId);
 
-            editForm.addEventListener("submit", async e => {
-              e.preventDefault();
+            if (error) {
+              console.error(error);
+              return toast(
+                "Nie udało się usunąć członka. Może mieć powiązane obecności lub przypisanie rodzica."
+              );
+            }
 
-              if (profile.role !== "supervisor") {
-                return toast("Tylko opiekun może edytować członków.");
-              }
-
-              const fd = new FormData(editForm);
-
-              const { error } = await supabaseClient
-                .from("members")
-                .update({
-                  full_name: String(fd.get("full_name")).trim(),
-                  active: fd.get("active") === "true"
-                })
-                .eq("id", member.id);
-
-              if (error) {
-                console.error(error);
-                return toast("Nie zapisano zmian. Sprawdź uprawnienia w Supabase.");
-              }
-
-              toast("Dane członka zostały zmienione.");
-              renderView();
-            });
-
-            editForm.querySelector(".cancel-member-edit").addEventListener("click", () => {
-              editor.innerHTML = "";
-            });
+            toast("Członek został usunięty.");
+            renderView();
           });
         });
+
 
       } else if (currentView === "attendance") {
         if(profile.role!=="supervisor"){shell("Obecności",`<div class="panel"><p>Historia obecności zostanie pokazana po przypisaniu Twojego konta do dziecka przez opiekuna.</p></div>`);return;}
