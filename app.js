@@ -75,10 +75,14 @@
     });
   }
   const navItems = [
-    ["home","Start","⌂"],["meetings","Zbiórki","▦"],["attendance","Obecności","✓"],
-    ["announcements","Komunikaty","!"],["members","Członkowie","♙"],["account","Konto","⚙"]
+    ["home","Start","⌂"],
+    ["meetings","Zbiórki","▦"],
+    ["attendance","Obecności","✓"],
+    ["announcements","Komunikaty","!"],
+    ["members","Członkowie","♙"],
+    ["guardians","Rodzice","♧"],
+    ["account","Konto","⚙"]
   ];
-
 function renderNav() {
   nav.hidden = false;
 
