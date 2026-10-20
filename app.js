@@ -358,12 +358,164 @@ function renderNav() {
           });
         });
 
-      } else if (currentView === "announcements") {
-        const rows = await loadRows("announcements","created_at",false);
-        shell("Komunikaty", `${profile.role==="supervisor"?`<div class="panel"><h2>Nowy komunikat</h2><form id="announcementForm"><label>Tytuł<input name="title" required maxlength="160"></label><label>Treść<textarea name="body" required rows="4"></textarea></label><button class="primary">Opublikuj</button></form></div>`:""}
-          <div class="panel">${rows.map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("")||"<p>Brak komunikatów.</p>"}</div>`);
-        const form=document.getElementById("announcementForm");
-        if(form)form.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(form);const {error}=await supabaseClient.from("announcements").insert({title:fd.get("title"),body:fd.get("body"),created_by:currentUser.id});if(error)return toast("Nie opublikowano. Sprawdź uprawnienia.");toast("Komunikat opublikowany.");renderView();});
+   
+} else if (currentView === "announcements") {
+  const rows = await loadRows("announcements", "created_at", false);
+
+  const { data: readRows, error: readError } = await supabaseClient
+    .from("announcement_reads")
+    .select("announcement_id,user_id,read_at");
+
+  if (readError) {
+    console.error("Błąd pobierania odczytów:", readError);
+    toast("Nie udało się pobrać potwierdzeń odczytu.");
+  }
+
+  const reads = readRows || [];
+
+  shell("Komunikaty", `
+    ${profile.role === "supervisor" ? `
+      <div class="panel">
+        <h2>Nowy komunikat</h2>
+        <form id="announcementForm">
+          <label>Tytuł<input name="title" required maxlength="160"></label>
+          <label>Treść<textarea name="body" required rows="4"></textarea></label>
+          <button class="primary">Opublikuj</button>
+        </form>
+      </div>
+    ` : ""}
+
+    <div class="panel">
+      ${rows.map(a => {
+        const myRead = reads.find(
+          r => r.announcement_id === a.id && r.user_id === currentUser.id
+        );
+        const readCount = reads.filter(
+          r => r.announcement_id === a.id
+        ).length;
+
+        return `
+          <article class="list-item">
+            <h3>${esc(a.title)}</h3>
+            <p>${esc(a.body)}</p>
+            <small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small>
+
+            ${profile.role === "supervisor" ? `
+              <p><strong>Potwierdzenia odczytu: ${readCount}</strong></p>
+              <button class="secondary" type="button"
+                data-edit-announcement="${esc(a.id)}">Edytuj</button>
+              <button class="secondary" type="button"
+                data-delete-announcement="${esc(a.id)}">Usuń</button>
+            ` : `
+              ${myRead
+                ? `<p class="status">Potwierdzono odczyt</p>`
+                : `<button class="primary" type="button"
+                    data-read-announcement="${esc(a.id)}">
+                    Potwierdzam odczyt
+                  </button>`
+              }
+            `}
+          </article>
+        `;
+      }).join("") || "<p>Brak komunikatów.</p>"}
+    </div>
+  `);
+
+  const form = document.getElementById("announcementForm");
+
+  if (form) {
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const fd = new FormData(form);
+
+      const { error } = await supabaseClient
+        .from("announcements")
+        .insert({
+          title: fd.get("title"),
+          body: fd.get("body"),
+          created_by: currentUser.id
+        });
+
+      if (error) {
+        console.error(error);
+        return toast("Nie opublikowano. Sprawdź uprawnienia.");
+      }
+
+      toast("Komunikat opublikowany.");
+      renderView();
+    });
+  }
+
+  app.querySelectorAll("[data-read-announcement]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const { error } = await supabaseClient
+        .from("announcement_reads")
+        .insert({
+          announcement_id: button.dataset.readAnnouncement,
+          user_id: currentUser.id
+        });
+
+      if (error) {
+        console.error(error);
+        return toast("Nie udało się potwierdzić odczytu.");
+      }
+
+      toast("Potwierdzono odczyt komunikatu.");
+      renderView();
+    });
+  });
+
+  app.querySelectorAll("[data-edit-announcement]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const a = rows.find(x => x.id === button.dataset.editAnnouncement);
+      if (!a || profile.role !== "supervisor") return;
+
+      const title = prompt("Tytuł komunikatu:", a.title);
+      if (title === null) return;
+
+      const body = prompt("Treść komunikatu:", a.body);
+      if (body === null) return;
+
+      if (!title.trim() || !body.trim()) {
+        return toast("Tytuł i treść nie mogą być puste.");
+      }
+
+      const { error } = await supabaseClient
+        .from("announcements")
+        .update({ title: title.trim(), body: body.trim() })
+        .eq("id", a.id);
+
+      if (error) {
+        console.error(error);
+        return toast("Nie udało się edytować komunikatu.");
+      }
+
+      toast("Komunikat został zmieniony.");
+      renderView();
+    });
+  });
+
+  app.querySelectorAll("[data-delete-announcement]").forEach(button => {
+    button.addEventListener("click", async () => {
+      if (profile.role !== "supervisor") return;
+
+      if (!confirm("Czy na pewno usunąć ten komunikat?")) return;
+
+      const { error } = await supabaseClient
+        .from("announcements")
+        .delete()
+        .eq("id", button.dataset.deleteAnnouncement);
+
+      if (error) {
+        console.error(error);
+        return toast("Nie udało się usunąć komunikatu.");
+      }
+
+      toast("Komunikat został usunięty.");
+      renderView();
+    });
+  });
+</>
 
       } else if (currentView === "members") {
         if (profile.role !== "supervisor") {
