@@ -1,10 +1,26 @@
+
 {
   "name": "MDP Warszowice",
-  "short_name": "MDP Warszowice",
+  "short_name": "MDP",
+  "description": "Oficjalna aplikacja Młodzieżowej Drużyny Pożarniczej Warszowice",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b1220",
-  "theme_color": "#101827",
-  "lang": "pl"
+  "background_color": "#090f1b",
+  "theme_color": "#e52e3d",
+  "lang": "pl",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
