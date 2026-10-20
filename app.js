@@ -128,6 +128,11 @@ function renderNav() {
     <span>Komunikaty</span>
     <strong>${announcements.length}</strong>
   </button>
+    ${profile.role === "guardian" ? `
+    <button class="stat panel" data-go="childAttendance">
+      <span>Obecności dziecka</span>
+    </button>
+  ` : ""}
   ${profile.role === "supervisor" ? `
     <button class="stat panel" data-go="attendance">
       <span>Obecności</span>
@@ -139,6 +144,72 @@ function renderNav() {
 </div>
 <div class="panel"><h2>Ostatnie komunikaty</h2>${announcements.slice(0,3).map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("") || "<p>Brak komunikatów.</p>"}</div>`);
         app.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{currentView=b.dataset.go;renderView();}));
+              } else if (currentView === "childAttendance") {
+        if (profile.role !== "guardian") {
+          currentView = "home";
+          return renderView();
+        }
+
+        const { data: links, error: linksError } =
+          await supabaseClient
+            .from("guardian_members")
+            .select("member_id")
+            .eq("guardian_id", currentUser.id);
+
+        if (linksError) throw linksError;
+
+        const memberIds = (links || []).map(link => link.member_id);
+
+        if (!memberIds.length) {
+          shell("Obecności dziecka", `
+            <div class="panel">
+              <p>Twoje konto nie ma jeszcze przypisanego dziecka. Skontaktuj się z opiekunem MDP.</p>
+            </div>
+          `);
+        } else {
+          const { data: attendanceRows, error: attendanceError } =
+            await supabaseClient
+              .from("attendance")
+              .select("meeting_id,member_id,status,notes,marked_at")
+              .in("member_id", memberIds)
+              .order("marked_at", { ascending: false });
+
+          if (attendanceError) throw attendanceError;
+
+          const meetings = await loadRows("meetings", "meeting_date", false);
+
+          const children = await supabaseClient
+            .from("members")
+            .select("id,full_name")
+            .in("id", memberIds);
+
+          if (children.error) throw children.error;
+
+          shell("Obecności dziecka", `
+            ${children.data.map(child => `
+              <div class="panel">
+                <h2>${esc(child.full_name)}</h2>
+                ${(attendanceRows || [])
+                  .filter(row => row.member_id === child.id)
+                  .map(row => {
+                    const meeting = meetings.find(m => m.id === row.meeting_id);
+                    const status = {
+                      present: "Obecny",
+                      absent: "Nieobecny",
+                      late: "Spóźniony"
+                    }[row.status] || row.status;
+
+                    return `<article class="list-item">
+                      <strong>${esc(meeting?.title || "Zbiórka")}</strong>
+                      <p>${meeting ? esc(new Date(meeting.meeting_date).toLocaleString("pl-PL")) : ""}</p>
+                      <p>Status: ${esc(status)}</p>
+                      ${row.notes ? `<p>Uwagi: ${esc(row.notes)}</p>` : ""}
+                    </article>`;
+                  }).join("") || "<p>Brak zapisanych obecności.</p>"}
+              </div>
+            `).join("")}
+          `);
+        }
       } else if (currentView === "meetings") {
         const rows = await loadRows("meetings","meeting_date",false);
         shell("Zbiórki", `${profile.role==="supervisor"?`<div class="panel"><h2>Dodaj zbiórkę</h2><form id="meetingForm"><label>Nazwa<input name="title" required maxlength="120"></label><label>Data i godzina<input name="meeting_date" type="datetime-local" required></label><label>Miejsce<input name="location" maxlength="120"></label><label>Informacje<textarea name="notes" rows="3"></textarea></label><button class="primary">Zapisz zbiórkę</button></form></div>`:""}
