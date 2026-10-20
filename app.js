@@ -99,7 +99,6 @@ function renderNav() {
     })
   );
 }
-  }
   async function loadRows(table, orderColumn, ascending=false) {
     const {data,error} = await supabaseClient.from(table).select("*").order(orderColumn,{ascending});
     if (error) throw error;
