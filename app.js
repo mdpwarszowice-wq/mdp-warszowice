@@ -212,17 +212,122 @@ function renderNav() {
             `).join("")}
           `);
         }
+     
       } else if (currentView === "meetings") {
-        const rows = await loadRows("meetings","meeting_date",false);
-        shell("Zbiórki", `${profile.role==="supervisor"?`<div class="panel"><h2>Dodaj zbiórkę</h2><form id="meetingForm"><label>Nazwa<input name="title" required maxlength="120"></label><label>Data i godzina<input name="meeting_date" type="datetime-local" required></label><label>Miejsce<input name="location" maxlength="120"></label><label>Informacje<textarea name="notes" rows="3"></textarea></label><button class="primary">Zapisz zbiórkę</button></form></div>`:""}
-          <div class="panel">${rows.map(m=>`<article class="list-item"><h3>${esc(m.title)}</h3><p>${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}${m.location?" · "+esc(m.location):""}</p>${m.notes?`<p>${esc(m.notes)}</p>`:""}</article>`).join("")||"<p>Brak zbiórek.</p>"}</div>`);
-        const form=document.getElementById("meetingForm");
-        if(form) form.addEventListener("submit",async e=>{
-          e.preventDefault();const fd=new FormData(form);
-          const {error}=await supabaseClient.from("meetings").insert({title:fd.get("title"),meeting_date:new Date(fd.get("meeting_date")).toISOString(),location:fd.get("location")||null,notes:fd.get("notes")||null,created_by:currentUser.id});
-          if(error)return toast("Nie zapisano zbiórki. Sprawdź uprawnienia.");
-          toast("Zbiórka zapisana.");renderView();
+        if (profile.role !== "supervisor") {
+          const rows = await loadRows("meetings", "meeting_date", false);
+          shell("Zbiórki", `
+            <div class="panel">
+              ${rows.map(m => `
+                <article class="list-item">
+                  <h3>${esc(m.title)}</h3>
+                  <p>${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}${m.location ? " · " + esc(m.location) : ""}</p>
+                  ${m.notes ? `<p>${esc(m.notes)}</p>` : ""}
+                </article>
+              `).join("") || "<p>Brak zbiórek.</p>"}
+            </div>
+          `);
+          return;
+        }
+
+        const rows = await loadRows("meetings", "meeting_date", false);
+
+        shell("Zbiórki", `
+          <div class="panel">
+            <h2>Dodaj zbiórkę</h2>
+            <form id="meetingForm">
+              <label>Nazwa<input name="title" required maxlength="120"></label>
+              <label>Data i godzina<input name="meeting_date" type="datetime-local" required></label>
+              <label>Miejsce<input name="location" maxlength="120"></label>
+              <label>Informacje<textarea name="notes" rows="3"></textarea></label>
+              <button class="primary">Zapisz zbiórkę</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <h2>Zaplanowane zbiórki</h2>
+            ${rows.map(m => `
+              <article class="list-item">
+                <h3>${esc(m.title)}</h3>
+                <p>${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}${m.location ? " · " + esc(m.location) : ""}</p>
+                ${m.notes ? `<p>${esc(m.notes)}</p>` : ""}
+                <button class="secondary" type="button" data-edit-meeting="${esc(m.id)}">Edytuj</button>
+                <div id="meeting-edit-${esc(m.id)}"></div>
+              </article>
+            `).join("") || "<p>Brak zbiórek.</p>"}
+          </div>
+        `);
+
+        const form = document.getElementById("meetingForm");
+
+        form.addEventListener("submit", async e => {
+          e.preventDefault();
+          const fd = new FormData(form);
+
+          const { error } = await supabaseClient.from("meetings").insert({
+            title: fd.get("title"),
+            meeting_date: new Date(fd.get("meeting_date")).toISOString(),
+            location: fd.get("location") || null,
+            notes: fd.get("notes") || null,
+            created_by: currentUser.id
+          });
+
+          if (error) return toast("Nie zapisano zbiórki. Sprawdź uprawnienia.");
+
+          toast("Zbiórka zapisana.");
+          renderView();
         });
+
+        app.querySelectorAll("[data-edit-meeting]").forEach(button => {
+          button.addEventListener("click", () => {
+            const meeting = rows.find(m => m.id === button.dataset.editMeeting);
+            if (!meeting) return;
+
+            const date = new Date(meeting.meeting_date);
+            const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+              .toISOString().slice(0, 16);
+
+            const editor = document.getElementById(`meeting-edit-${meeting.id}`);
+
+            editor.innerHTML = `
+              <form class="meeting-edit-form">
+                <label>Nazwa<input name="title" required maxlength="120" value="${esc(meeting.title)}"></label>
+                <label>Data i godzina<input name="meeting_date" type="datetime-local" required value="${localDate}"></label>
+                <label>Miejsce<input name="location" maxlength="120" value="${esc(meeting.location || "")}"></label>
+                <label>Informacje<textarea name="notes" rows="3">${esc(meeting.notes || "")}</textarea></label>
+                <button class="primary" type="submit">Zapisz zmiany</button>
+                <button class="secondary cancel-edit" type="button">Anuluj</button>
+              </form>
+            `;
+
+            const editForm = editor.querySelector("form");
+
+            editForm.addEventListener("submit", async e => {
+              e.preventDefault();
+              const fd = new FormData(editForm);
+
+              const { error } = await supabaseClient.from("meetings").update({
+                title: fd.get("title"),
+                meeting_date: new Date(fd.get("meeting_date")).toISOString(),
+                location: fd.get("location") || null,
+                notes: fd.get("notes") || null
+              }).eq("id", meeting.id);
+
+              if (error) {
+                console.error(error);
+                return toast("Nie zapisano zmian. Sprawdź uprawnienia edycji zbiórek w bazie.");
+              }
+
+              toast("Zbiórka została zaktualizowana.");
+              renderView();
+            });
+
+            editForm.querySelector(".cancel-edit").addEventListener("click", () => {
+              editor.innerHTML = "";
+            });
+          });
+        });
+
       } else if (currentView === "announcements") {
         const rows = await loadRows("announcements","created_at",false);
         shell("Komunikaty", `${profile.role==="supervisor"?`<div class="panel"><h2>Nowy komunikat</h2><form id="announcementForm"><label>Tytuł<input name="title" required maxlength="160"></label><label>Treść<textarea name="body" required rows="4"></textarea></label><button class="primary">Opublikuj</button></form></div>`:""}
