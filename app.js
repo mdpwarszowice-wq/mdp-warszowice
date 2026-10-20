@@ -251,7 +251,10 @@ function renderNav() {
                 <h3>${esc(m.title)}</h3>
                 <p>${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}${m.location ? " · " + esc(m.location) : ""}</p>
                 ${m.notes ? `<p>${esc(m.notes)}</p>` : ""}
-                <button class="secondary" type="button" data-edit-meeting="${esc(m.id)}">Edytuj</button>
+               
+<button class="secondary" type="button" data-edit-meeting="${esc(m.id)}">Edytuj</button>
+<button class="secondary" type="button" data-delete-meeting="${esc(m.id)}">Usuń</button>
+
                 <div id="meeting-edit-${esc(m.id)}"></div>
               </article>
             `).join("") || "<p>Brak zbiórek.</p>"}
