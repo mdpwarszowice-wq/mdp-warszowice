@@ -331,6 +331,33 @@ function renderNav() {
           });
         });
 
+        app.querySelectorAll("[data-delete-meeting]").forEach(button => {
+          button.addEventListener("click", async () => {
+            if (profile.role !== "supervisor") {
+              return toast("Tylko opiekun może usunąć zbiórkę.");
+            }
+
+            const meetingId = button.dataset.deleteMeeting;
+
+            if (!confirm("Czy na pewno chcesz usunąć tę zbiórkę? Tej operacji nie można cofnąć.")) {
+              return;
+            }
+
+            const { error } = await supabaseClient
+              .from("meetings")
+              .delete()
+              .eq("id", meetingId);
+
+            if (error) {
+              console.error(error);
+              return toast("Nie udało się usunąć zbiórki. Sprawdź uprawnienia w Supabase.");
+            }
+
+            toast("Zbiórka została usunięta.");
+            renderView();
+          });
+        });
+
       } else if (currentView === "announcements") {
         const rows = await loadRows("announcements","created_at",false);
         shell("Komunikaty", `${profile.role==="supervisor"?`<div class="panel"><h2>Nowy komunikat</h2><form id="announcementForm"><label>Tytuł<input name="title" required maxlength="160"></label><label>Treść<textarea name="body" required rows="4"></textarea></label><button class="primary">Opublikuj</button></form></div>`:""}
