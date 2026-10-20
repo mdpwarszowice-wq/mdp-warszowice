@@ -513,10 +513,10 @@ function renderNav() {
 
       toast("Komunikat został usunięty.");
       renderView();
-    });
+      });
   });
 
-      } else if (currentView === "members") {
+} else if (currentView === "members") {
         if (profile.role !== "supervisor") {
           shell("Członkowie", `<div class="panel"><p>Lista członków jest dostępna tylko w panelu opiekuna.</p></div>`);
           return;
