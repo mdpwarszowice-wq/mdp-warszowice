@@ -128,9 +128,7 @@ function renderNav() {
     <span>Komunikaty</span>
     <strong>${announcements.length}</strong>
   </button>
-   <button class="stat panel" data-go="childAttendance">
-  <span>TEST — Obecności dziecka</span>
-</button>
+  ${profile.role === "guardian" ? `
     <button class="stat panel" data-go="childAttendance">
       <span>Obecności dziecka</span>
     </button>
