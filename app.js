@@ -167,6 +167,110 @@ function renderNav() {
         shell("Obecności",`<div class="panel"><h2>Zaznacz obecność</h2>${!meetings.length||!members.length?"Najpierw dodaj członka i zbiórkę.":`<form id="attendanceForm"><label>Zbiórka<select name="meeting_id" required>${meetings.map(m=>`<option value="${esc(m.id)}">${esc(m.title)} — ${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}</option>`).join("")}</select></label><label>Członek<select name="member_id" required>${members.map(m=>`<option value="${esc(m.id)}">${esc(m.full_name)}</option>`).join("")}</select></label><label>Status<select name="status"><option value="present">Obecny</option><option value="absent">Nieobecny</option><option value="late">Spóźniony</option></select></label><label>Uwagi<textarea name="notes" rows="2"></textarea></label><button class="primary">Zapisz obecność</button></form>`}</div><div class="panel"><h2>Ostatnie wpisy</h2>${rows.slice(0,30).map(r=>{const m=members.find(x=>x.id===r.member_id);const mt=meetings.find(x=>x.id===r.meeting_id);return `<article class="list-item"><strong>${esc(m?.full_name||"Członek")}</strong><p>${esc(mt?.title||"Zbiórka")} · ${({present:"Obecny",absent:"Nieobecny",late:"Spóźniony"})[r.status]}</p></article>`}).join("")||"<p>Brak wpisów.</p>"}</div>`);
         const form=document.getElementById("attendanceForm");
         if(form)form.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(form);const row={meeting_id:fd.get("meeting_id"),member_id:fd.get("member_id"),status:fd.get("status"),notes:fd.get("notes")||null,marked_by:currentUser.id,marked_at:new Date().toISOString()};const {error}=await supabaseClient.from("attendance").upsert(row,{onConflict:"meeting_id,member_id"});if(error)return toast("Nie zapisano obecności. Sprawdź uprawnienia.");toast("Obecność zapisana.");renderView();});
+      
+      } else if (currentView === "guardians") {
+        if (profile.role !== "supervisor") {
+          currentView = "home";
+          return renderView();
+        }
+
+        const { data: guardians, error: guardianError } =
+          await supabaseClient.from("profiles")
+            .select("id,full_name")
+            .eq("role", "guardian")
+            .order("full_name");
+
+        if (guardianError) throw guardianError;
+
+        const members = await loadRows("members", "full_name", true);
+
+        const { data: links, error: linksError } =
+          await supabaseClient.from("guardian_members")
+            .select("guardian_id,member_id");
+
+        if (linksError) throw linksError;
+
+        shell("Rodzice", `
+          <div class="panel">
+            <h2>Przypisz rodzica do dziecka</h2>
+            ${!guardians?.length
+              ? "<p>Brak kont rodziców. Najpierw utwórz konto rodzica.</p>"
+              : !members.length
+              ? "<p>Najpierw dodaj członka drużyny.</p>"
+              : `
+                <form id="guardianLinkForm">
+                  <label>Rodzic
+                    <select name="guardian_id" required>
+                      ${guardians.map(g => `
+                        <option value="${esc(g.id)}">
+                          ${esc(g.full_name || "Rodzic bez nazwy")}
+                        </option>
+                      `).join("")}
+                    </select>
+                  </label>
+                  <label>Dziecko
+                    <select name="member_id" required>
+                      ${members.map(m => `
+                        <option value="${esc(m.id)}">
+                          ${esc(m.full_name)}
+                        </option>
+                      `).join("")}
+                    </select>
+                  </label>
+                  <button class="primary">Przypisz rodzica</button>
+                </form>
+              `}
+          </div>
+
+          <div class="panel">
+            <h2>Obecne przypisania</h2>
+            ${(links || []).map(link => {
+              const g = guardians?.find(x => x.id === link.guardian_id);
+              const m = members.find(x => x.id === link.member_id);
+              return `<article class="list-item">
+                <strong>${esc(g?.full_name || "Rodzic")}</strong>
+                <p>${esc(m?.full_name || "Członek")}</p>
+              </article>`;
+            }).join("") || "<p>Brak przypisań.</p>"}
+          </div>
+        `);
+
+        const form = document.getElementById("guardianLinkForm");
+
+        if (form) form.addEventListener("submit", async e => {
+          e.preventDefault();
+
+          const fd = new FormData(form);
+          const guardian_id = fd.get("guardian_id");
+          const member_id = fd.get("member_id");
+
+          const { data: existing, error: checkError } =
+            await supabaseClient.from("guardian_members")
+              .select("guardian_id")
+              .eq("guardian_id", guardian_id)
+              .eq("member_id", member_id)
+              .maybeSingle();
+
+          if (checkError) {
+            return toast("Nie udało się sprawdzić przypisania.");
+          }
+
+          if (existing) {
+            return toast("Ten rodzic jest już przypisany do tego dziecka.");
+          }
+
+          const { error } = await supabaseClient
+            .from("guardian_members")
+            .insert({ guardian_id, member_id });
+
+          if (error) {
+            return toast("Nie udało się przypisać rodzica. Sprawdź uprawnienia.");
+          }
+
+          toast("Rodzic został przypisany.");
+          renderView();
+        });
+
       } else if (currentView === "account") {
         shell("Konto",`<div class="panel"><p><strong>E-mail:</strong> ${esc(currentUser.email)}</p><p><strong>Rola:</strong> ${esc(roleName(profile.role))}</p><button id="logout" class="secondary">Wyloguj się</button></div>`);
         document.getElementById("logout").addEventListener("click",async()=>{await supabaseClient.auth.signOut();currentUser=null;profile=null;renderAuth();});
