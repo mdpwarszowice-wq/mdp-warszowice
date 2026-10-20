@@ -115,10 +115,26 @@ function renderNav() {
         const announcements = await loadRows("announcements","created_at",false);
         shell("Cześć!", `
           <div class="hero panel"><p class="eyebrow">PANEL UŻYTKOWNIKA</p><h2>Witaj w MDP Warszowice</h2><p>Jesteś zalogowany jako ${esc(roleName(profile.role))}.</p></div>
-          <div class="stats-grid">
-            <button class="stat panel" data-go="meetings"><span>Zbiórki</span><strong>${meetings.length}</strong></button>
-            <button class="stat panel" data-go="announcements"><span>Komunikaty</span><strong>${announcements.length}</strong></button>
-          </div>
+        
+<div class="stats-grid">
+  <button class="stat panel" data-go="meetings">
+    <span>Zbiórki</span>
+    <strong>${meetings.length}</strong>
+  </button>
+  <button class="stat panel" data-go="announcements">
+    <span>Komunikaty</span>
+    <strong>${announcements.length}</strong>
+  </button>
+  ${profile.role === "supervisor" ? `
+    <button class="stat panel" data-go="attendance">
+      <span>Obecności</span>
+    </button>
+    <button class="stat panel" data-go="members">
+      <span>Członkowie</span>
+    </button>
+  ` : ""}
+</div>
+
           <div class="panel"><h2>Ostatnie komunikaty</h2>${announcements.slice(0,3).map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("") || "<p>Brak komunikatów.</p>"}</div>`);
         app.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{currentView=b.dataset.go;renderView();}));
       } else if (currentView === "meetings") {
