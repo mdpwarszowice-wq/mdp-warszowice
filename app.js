@@ -117,7 +117,7 @@ function renderNav() {
       if (currentView === "home") {
         const meetings = await loadRows("meetings","meeting_date",false);
         const announcements = await loadRows("announcements","created_at",false);
-        shell("Cześć!", `
+        shell("Czołem!", `
           <div class="hero panel"><p class="eyebrow">PANEL UŻYTKOWNIKA</p><h2>Witaj w MDP Warszowice</h2><p>Jesteś zalogowany jako ${esc(roleName(profile.role))}.</p></div>
         <div class="stats-grid">
   <button class="stat panel" data-go="meetings">
@@ -129,7 +129,7 @@ function renderNav() {
     <strong>${announcements.length}</strong>
   </button>
   
-  ${profile.role === "guardian" ? `
+  ${true ? `
     <button class="stat panel" data-go="childAttendance">
       <span>Obecności dziecka</span>
     </button>
