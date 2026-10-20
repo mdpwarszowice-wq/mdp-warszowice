@@ -441,12 +441,11 @@ function renderNav() {
               .delete()
               .eq("id", memberId);
 
-            if (error) {
-              console.error(error);
-              return toast(
-                "Nie udało się usunąć członka. Może mieć powiązane obecności lub przypisanie rodzica."
-              );
-            }
+         if (error) {
+  console.error("Błąd usuwania członka:", error);
+  alert("Błąd Supabase:\n" + error.message);
+  return;
+}
 
             toast("Członek został usunięty.");
             renderView();
