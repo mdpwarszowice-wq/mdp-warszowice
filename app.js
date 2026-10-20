@@ -364,11 +364,112 @@ function renderNav() {
           <div class="panel">${rows.map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("")||"<p>Brak komunikatów.</p>"}</div>`);
         const form=document.getElementById("announcementForm");
         if(form)form.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(form);const {error}=await supabaseClient.from("announcements").insert({title:fd.get("title"),body:fd.get("body"),created_by:currentUser.id});if(error)return toast("Nie opublikowano. Sprawdź uprawnienia.");toast("Komunikat opublikowany.");renderView();});
+
       } else if (currentView === "members") {
-        if(profile.role!=="supervisor"){shell("Członkowie",`<div class="panel"><p>Lista członków jest dostępna tylko w panelu opiekuna. Jeśli potrzebujesz dostępu, skontaktuj się z opiekunem.</p></div>`);return;}
-        const rows=await loadRows("members","full_name",true);
-        shell("Członkowie",`<div class="panel"><h2>Dodaj członka</h2><form id="memberForm"><label>Imię i nazwisko<input name="full_name" required maxlength="160"></label><button class="primary">Dodaj członka</button></form></div><div class="panel">${rows.map(m=>`<article class="list-item"><strong>${esc(m.full_name)}</strong><span class="status">${m.active?"Aktywny":"Nieaktywny"}</span></article>`).join("")||"<p>Brak członków.</p>"}</div>`);
-        document.getElementById("memberForm").addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const {error}=await supabaseClient.from("members").insert({full_name:fd.get("full_name")});if(error)return toast("Nie dodano członka. Sprawdź uprawnienia.");toast("Dodano członka.");renderView();});
+        if (profile.role !== "supervisor") {
+          shell("Członkowie", `<div class="panel"><p>Lista członków jest dostępna tylko w panelu opiekuna.</p></div>`);
+          return;
+        }
+
+        const rows = await loadRows("members", "full_name", true);
+
+        shell("Członkowie", `
+          <div class="panel">
+            <h2>Dodaj członka</h2>
+            <form id="memberForm">
+              <label>Imię i nazwisko
+                <input name="full_name" required maxlength="160">
+              </label>
+              <button class="primary">Dodaj członka</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <h2>Lista członków</h2>
+            ${rows.map(m => `
+              <article class="list-item">
+                <strong>${esc(m.full_name)}</strong>
+                <span class="status">${m.active ? "Aktywny" : "Nieaktywny"}</span>
+                <p>
+                  <button class="secondary" type="button" data-edit-member="${esc(m.id)}">Edytuj</button>
+                </p>
+                <div id="member-edit-${esc(m.id)}"></div>
+              </article>
+            `).join("") || "<p>Brak członków.</p>"}
+          </div>
+        `);
+
+        document.getElementById("memberForm").addEventListener("submit", async e => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+
+          const { error } = await supabaseClient.from("members").insert({
+            full_name: String(fd.get("full_name")).trim()
+          });
+
+          if (error) return toast("Nie dodano członka. Sprawdź uprawnienia.");
+
+          toast("Dodano członka.");
+          renderView();
+        });
+
+        app.querySelectorAll("[data-edit-member]").forEach(button => {
+          button.addEventListener("click", () => {
+            const member = rows.find(m => m.id === button.dataset.editMember);
+            if (!member) return;
+
+            const editor = document.getElementById(`member-edit-${member.id}`);
+
+            editor.innerHTML = `
+              <form class="member-edit-form">
+                <label>Imię i nazwisko
+                  <input name="full_name" required maxlength="160" value="${esc(member.full_name)}">
+                </label>
+                <label>Status
+                  <select name="active">
+                    <option value="true" ${member.active ? "selected" : ""}>Aktywny</option>
+                    <option value="false" ${!member.active ? "selected" : ""}>Nieaktywny</option>
+                  </select>
+                </label>
+                <button class="primary" type="submit">Zapisz zmiany</button>
+                <button class="secondary cancel-member-edit" type="button">Anuluj</button>
+              </form>
+            `;
+
+            const editForm = editor.querySelector("form");
+
+            editForm.addEventListener("submit", async e => {
+              e.preventDefault();
+
+              if (profile.role !== "supervisor") {
+                return toast("Tylko opiekun może edytować członków.");
+              }
+
+              const fd = new FormData(editForm);
+
+              const { error } = await supabaseClient
+                .from("members")
+                .update({
+                  full_name: String(fd.get("full_name")).trim(),
+                  active: fd.get("active") === "true"
+                })
+                .eq("id", member.id);
+
+              if (error) {
+                console.error(error);
+                return toast("Nie zapisano zmian. Sprawdź uprawnienia w Supabase.");
+              }
+
+              toast("Dane członka zostały zmienione.");
+              renderView();
+            });
+
+            editForm.querySelector(".cancel-member-edit").addEventListener("click", () => {
+              editor.innerHTML = "";
+            });
+          });
+        });
+
       } else if (currentView === "attendance") {
         if(profile.role!=="supervisor"){shell("Obecności",`<div class="panel"><p>Historia obecności zostanie pokazana po przypisaniu Twojego konta do dziecka przez opiekuna.</p></div>`);return;}
         const [members,meetings,rows]=await Promise.all([loadRows("members","full_name",true),loadRows("meetings","meeting_date",false),loadRows("attendance","marked_at",false)]);
