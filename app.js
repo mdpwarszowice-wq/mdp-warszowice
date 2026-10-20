@@ -515,7 +515,6 @@ function renderNav() {
       renderView();
     });
   });
-</>
 
       } else if (currentView === "members") {
         if (profile.role !== "supervisor") {
