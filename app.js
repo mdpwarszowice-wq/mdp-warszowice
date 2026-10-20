@@ -78,14 +78,27 @@
     ["home","Start","⌂"],["meetings","Zbiórki","▦"],["attendance","Obecności","✓"],
     ["announcements","Komunikaty","!"],["members","Członkowie","♙"],["account","Konto","⚙"]
   ];
-  function renderNav() {
-    nav.hidden = false;
-    nav.innerHTML = navItems.map(([id,label,icon]) =>
-      `<button type="button" class="${currentView===id?"active":""}" data-view="${id}"><span>${icon}</span>${label}</button>`
-    ).join("");
-    nav.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => {
-      currentView = b.dataset.view; renderView();
-    }));
+
+function renderNav() {
+  nav.hidden = false;
+
+  const visibleItems = profile.role === "supervisor"
+    ? navItems
+    : navItems.filter(([id]) =>
+        !["attendance", "members"].includes(id)
+      );
+
+  nav.innerHTML = visibleItems.map(([id, label, icon]) =>
+    `<button type="button" class="${currentView === id ? "active" : ""}" data-view="${id}"><span>${icon}</span>${label}</button>`
+  ).join("");
+
+  nav.querySelectorAll("[data-view]").forEach(b =>
+    b.addEventListener("click", () => {
+      currentView = b.dataset.view;
+      renderView();
+    })
+  );
+}
   }
   async function loadRows(table, orderColumn, ascending=false) {
     const {data,error} = await supabaseClient.from(table).select("*").order(orderColumn,{ascending});
