@@ -1,102 +1,166 @@
-const sampleMembers = [
-  {id:"1",name:"Anna Kowalska",status:"Nieoznaczono"},
-  {id:"2",name:"Jakub Nowak",status:"Nieoznaczono"},
-  {id:"3",name:"Oliwia Wiśniewska",status:"Nieoznaczono"},
-  {id:"4",name:"Mateusz Wójcik",status:"Nieoznaczono"},
-  {id:"5",name:"Zuzanna Kaczmarek",status:"Nieoznaczono"}
-];
-const initialMeetings = [
-  {id:"m1",title:"Pierwsza pomoc",date:"2026-10-24",time:"16:00",note:"Ćwiczenia praktyczne",members:sampleMembers.map(m=>({...m}))},
-  {id:"m2",title:"Wiedza pożarnicza",date:"2026-10-17",time:"16:00",note:"Przygotowanie do testu",members:sampleMembers.map(m=>({...m,status:m.id==="2"?"Obecny":"Nieoznaczono"}))}
-];
-const announcements = [
-  {id:"a1",title:"Zbiórka w sobotę",date:"2026-10-20",body:"Pamiętajcie o zbiórce o godzinie 16:00. Zabierzcie ubranie do ćwiczeń."},
-  {id:"a2",title:"Ćwiczenia z pierwszej pomocy",date:"2026-10-16",body:"Na najbliższej zbiórce będziemy ćwiczyć podstawowe czynności ratownicze."}
-];
-let role = "guardian", tab = "home", selectedMeeting = "m1", meetings = initialMeetings;
-const app = document.querySelector("#app"), nav = document.querySelector("#nav"), roleBadge = document.querySelector("#roleBadge");
-const roleNames = {guardian:"Opiekun",member:"Członek MDP",parent:"Rodzic"};
-const navs = {
- guardian:[["home","Start","⌂"],["attendance","Dziennik","☑"],["new","Dodaj","+"],["announcements","Komunikaty","▣"],["stats","Raporty","▥"]],
- member:[["home","Start","⌂"],["attendance","Zbiórki","☑"],["announcements","Komunikaty","▣"]],
- parent:[["home","Start","⌂"],["attendance","Obecność","☑"],["announcements","Komunikaty","▣"]]
-};
-const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function toast(msg){const el=document.querySelector("#toast");el.textContent=msg;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),3500)}
-function currentMeeting(){return meetings.find(m=>m.id===selectedMeeting)||meetings[0]}
-function counts(m){const ms=m?.members||[];return {present:ms.filter(x=>x.status==="Obecny").length,absent:ms.filter(x=>x.status==="Nieobecny").length,late:ms.filter(x=>x.status==="Spóźniony").length}}
-function card(content){return `<section class="card">${content}</section>`}
-function btn(label,action,secondary=false){return `<button class="btn ${secondary?"secondary":""}" data-action="${action}">${label}</button>`}
-function meetingSummary(m){return `<strong>${esc(m.title)}</strong><div class="muted">${esc(m.date)} · ${esc(m.time)}</div>${m.note?`<p class="note">${esc(m.note)}</p>`:""}`}
-function home(){
- const m=meetings[0];
- if(role==="guardian") return `<h1 class="greeting">Cześć! 👋</h1><div class="muted">Panel opiekuna</div>
- <div class="stats"><section class="card"><div class="stat-number">${sampleMembers.length}</div><div class="stat-label">Członków MDP</div></section><section class="card"><div class="stat-number">${meetings.length}</div><div class="stat-label">Zbiórek w dzienniku</div></section></div>
- <button class="summon" data-action="summon"><span class="big">🚨</span><strong>ZWOŁAJ MDP</strong><span>Powiadomienie z dźwiękiem syreny · demo</span></button>
- <h2 class="section-title">Zarządzanie drużyną</h2><div class="grid">
- <button class="quick" data-tab="attendance"><span>☑️</span>Dziennik zbiórek</button><button class="quick" data-tab="members"><span>👥</span>Członkowie</button>
- <button class="quick" data-tab="new"><span>➕</span>Dodaj zbiórkę</button><button class="quick" data-tab="stats"><span>📊</span>Frekwencja</button>
- <button class="quick" data-tab="announcements"><span>📣</span>Komunikaty</button></div>
- <h2 class="section-title">Najbliższa zbiórka</h2>${card(`${meetingSummary(m)}${btn("Otwórz dziennik obecności","open-meeting",true)}`)}
- <p class="notice">To jest prototyp. Dane przykładowe są przechowywane w tej sesji i nie synchronizują się między telefonami.</p>`;
- if(role==="parent") return `<h1 class="greeting">Dzień dobry 👋</h1><div class="muted">Panel rodzica · konto demonstracyjne</div>${card(`<strong>Historia obecności dziecka</strong><p class="note">W pełnej wersji rodzic zobaczy wyłącznie dziecko przypisane przez opiekuna.</p>${meetings.map(m=>{const ch=m.members.find(x=>x.id==="2");return `<div class="history"><div><strong>${esc(m.title)}</strong><div class="muted">${esc(m.date)}</div></div><span class="status">${esc(ch?.status||"Nieoznaczono")}</span></div>`}).join("")}`)}<h2 class="section-title">Ostatnie komunikaty</h2>${announcementCards()}`;
- return `<h1 class="greeting">Cześć! 👋</h1><div class="muted">Panel członka MDP · konto demonstracyjne</div>${card(`<strong>Witaj w MDP Warszowice</strong><p class="note">Tutaj sprawdzisz terminy zbiórek i komunikaty. Obecność w dzienniku zatwierdza opiekun.</p>`)}<h2 class="section-title">Najbliższa zbiórka</h2>${card(meetingSummary(m))}<h2 class="section-title">Ostatnie komunikaty</h2>${announcementCards()}`;
-}
-function attendance(){
- const m=currentMeeting(), c=counts(m);
- let list = role==="parent" ? m.members.filter(x=>x.id==="2") : m.members;
- return `<h1 class="page-title">${role==="guardian"?"Dziennik obecności":"Zbiórki i obecność"}</h1><div class="muted">${role==="guardian"?"Obecność oznacza i zatwierdza opiekun.":"Podgląd tylko do odczytu."}</div>
- <div class="chips">${meetings.map(x=>`<button class="chip ${x.id===m.id?"active":""}" data-meeting="${x.id}"><strong>${esc(x.title)}</strong><div class="muted">${esc(x.date)}</div></button>`).join("")}</div>
- ${card(`${meetingSummary(m)}<div class="counts"><span class="green">Obecni: ${c.present}</span><span class="red">Nieobecni: ${c.absent}</span><span class="gray">Spóźnieni: ${c.late}</span></div>`)}
- ${list.map(member=>card(`<div class="member-name">${role==="parent"?"Jakub Nowak":esc(member.name)}</div><div class="status">Status: ${esc(member.status)}</div>${role==="guardian"?`<div class="status-row">${["Obecny","Nieobecny","Spóźniony"].map(s=>`<button class="status-btn ${member.status===s?"active":""}" data-status="${s}" data-member="${member.id}">${s}</button>`).join("")}</div>`:`<p class="muted">Podgląd tylko do odczytu</p>`}`)).join("")}
- ${role==="guardian"?btn("Zapisz oznaczenia (demo)","save-attendance"):""}
- <p class="notice">W prototypie zmiany nie są zapisywane na serwerze. Nie używaj go jeszcze jako oficjalnego dziennika.</p>`;
-}
-function newMeeting(){
- if(role!=="guardian") return `<h1 class="page-title">Nowa zbiórka</h1>${card("Tylko opiekun może tworzyć zbiórki.")}`;
- return `<h1 class="page-title">Nowa zbiórka</h1><div class="muted">Dodaj termin i temat zajęć.</div>${card(`<form id="meetingForm">
- <label class="field">Temat zbiórki *</label><input class="input" name="title" required placeholder="Np. Pierwsza pomoc">
- <label class="field">Data</label><input class="input" type="date" name="date" value="2026-10-31" required>
- <label class="field">Godzina</label><input class="input" type="time" name="time" value="16:00" required>
- <label class="field">Notatki / przebieg zajęć</label><textarea class="input" name="note" placeholder="Plan zajęć, materiały, uwagi..."></textarea>
- <button class="btn" type="submit">Dodaj zbiórkę</button></form>`)}`;
-}
-function members(){
- if(role!=="guardian") return `<h1 class="page-title">Członkowie MDP</h1>${card("Lista członków jest dostępna wyłącznie opiekunowi.")}`;
- return `<h1 class="page-title">Członkowie MDP</h1><div class="muted">Lista demonstracyjna — dane nie są prawdziwe.</div>${sampleMembers.map(m=>card(`<strong>${esc(m.name)}</strong><div class="muted">Członek MDP · konto demo</div>`)).join("")}${btn("Dodaj członka (kolejny etap)","coming-soon",true)}`;
-}
-function stats(){
- if(role!=="guardian") return `<h1 class="page-title">Frekwencja</h1>${card(role==="parent"?"Rodzic widzi historię przypisanego dziecka.":"Raporty całej drużyny są dostępne dla opiekuna.")}`;
- return `<h1 class="page-title">Frekwencja</h1>${meetings.map(m=>{let c=counts(m),pct=m.members.length?Math.round(c.present/m.members.length*100):0;return card(`<strong>${esc(m.title)}</strong><div class="muted">${esc(m.date)} · ${m.members.length} osób</div><div class="progress"><span style="width:${pct}%"></span></div><p class="note">Obecni: ${c.present} · Nieobecni: ${c.absent} · Spóźnieni: ${c.late}</p>`) }).join("")}`;
-}
-function announcementCards(){return announcements.map(a=>card(`<strong>${esc(a.title)}</strong><div class="muted">${esc(a.date)}</div><p class="note">${esc(a.body)}</p>`)).join("")}
-function announcementScreen(){return `<h1 class="page-title">Komunikaty</h1><div class="muted">Widok demonstracyjny dla wszystkich ról.</div>${role==="guardian"?btn("Dodaj komunikat (kolejny etap)","coming-soon",true):""}${announcementCards()}<p class="notice">Wysyłka push i SMS nie jest jeszcze podłączona.</p>`}
-function render(){
- roleBadge.textContent=roleNames[role];
- const pages={home,attendance,new:newMeeting,members,stats,announcements:announcementScreen};
- app.innerHTML=(pages[tab]||home)();
- nav.innerHTML=navs[role].map(([id,label,ico])=>`<button class="nav-item ${tab===id?"active":""}" data-tab="${id}"><span class="ico">${ico}</span>${label}</button>`).join("");
-}
-document.addEventListener("click",e=>{
- const t=e.target.closest("button"); if(!t)return;
- if(t.dataset.tab){tab=t.dataset.tab;render();return}
- if(t.dataset.meeting){selectedMeeting=t.dataset.meeting;render();return}
- if(t.dataset.status){if(role!=="guardian"){toast("Tylko opiekun może zmieniać obecność.");return}
- const m=currentMeeting();m.members=m.members.map(x=>x.id===t.dataset.member?{...x,status:t.dataset.status}:x);render();return}
- switch(t.dataset.action){
-  case "summon": if(role!=="guardian"){toast("Tylko opiekun może zwoływać MDP.");break} alert("DEMO: nie wysłano powiadomienia ani SMS-a. W kolejnej wersji podłączymy powiadomienia push z dźwiękiem syreny.");break;
-  case "open-meeting": selectedMeeting=meetings[0].id;tab="attendance";render();break;
-  case "save-attendance": toast("Oznaczenia są widoczne tylko w tej sesji demonstracyjnej.");break;
-  case "coming-soon": toast("Funkcja zostanie dodana w kolejnym etapie.");break;
- }
-});
-document.addEventListener("submit",e=>{
- if(e.target.id!=="meetingForm")return;
- e.preventDefault();if(role!=="guardian")return;
- const data=new FormData(e.target);
- const m={id:"m"+Date.now(),title:String(data.get("title")).trim(),date:String(data.get("date")),time:String(data.get("time")),note:String(data.get("note")||""),members:sampleMembers.map(x=>({...x,status:"Nieoznaczono"}))};
- meetings.unshift(m);selectedMeeting=m.id;tab="attendance";render();toast("Dodano zbiórkę do prototypu.");
-});
-roleBadge.addEventListener("click",()=>{role=role==="guardian"?"member":role==="member"?"parent":"guardian";tab="home";render();toast("Tryb demonstracyjny: "+roleNames[role]);});
-if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(()=>{});
-render();
+(() => {
+  const app = document.getElementById("app");
+  const nav = document.getElementById("nav");
+  const roleBadge = document.getElementById("roleBadge");
+  const toastEl = document.getElementById("toast");
+  let supabaseClient = null;
+  let currentUser = null;
+  let profile = null;
+  let currentView = "home";
+  let toastTimer;
+
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+  function toast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3500);
+  }
+  function configured() {
+    return window.MDP_SUPABASE_URL &&
+      !window.MDP_SUPABASE_URL.includes("WKLEJ_TUTAJ") &&
+      window.MDP_SUPABASE_PUBLISHABLE_KEY &&
+      !window.MDP_SUPABASE_PUBLISHABLE_KEY.includes("WKLEJ_TUTAJ");
+  }
+  function roleName(role) {
+    return ({supervisor:"Opiekun", guardian:"Rodzic", member:"Członek MDP"})[role] || "Użytkownik";
+  }
+  function shell(title, body) {
+    app.innerHTML = `<section class="page-head"><div><p class="eyebrow">MDP WARSZOWICE</p><h1>${esc(title)}</h1></div></section>${body}`;
+  }
+  function renderSetupError() {
+    roleBadge.textContent = "Konfiguracja";
+    nav.hidden = true;
+    shell("Konfiguracja połączenia", `
+      <div class="panel">
+        <h2>Brakuje ustawień Supabase</h2>
+        <p>Otwórz plik <code>config.js</code> na komputerze i wpisz prawdziwy Project URL oraz Publishable key z panelu Supabase.</p>
+        <p>Nie używaj klucza <code>secret</code> ani <code>service_role</code>. Zapisz plik, wgraj go do głównego katalogu repozytorium GitHub i odśwież tę stronę.</p>
+      </div>`);
+  }
+  function renderAuth() {
+    roleBadge.textContent = "Niezalogowany";
+    nav.hidden = true;
+    shell("Witaj w dzienniku", `
+      <div class="panel auth-panel">
+        <h2>Logowanie</h2>
+        <p>Użyj konta utworzonego przez opiekuna MDP Warszowice.</p>
+        <form id="loginForm">
+          <label>Adres e-mail<input name="email" type="email" autocomplete="username" required></label>
+          <label>Hasło<input name="password" type="password" autocomplete="current-password" required></label>
+          <button class="primary" type="submit">Zaloguj się</button>
+        </form>
+        <p class="muted">Nie masz konta? Poproś opiekuna o jego utworzenie. Rejestracja publiczna jest wyłączona.</p>
+        <button id="resetPassword" class="secondary" type="button">Nie pamiętam hasła</button>
+      </div>`);
+    document.getElementById("loginForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const fd = new FormData(e.currentTarget);
+      const {error} = await supabaseClient.auth.signInWithPassword({
+        email: String(fd.get("email")).trim(),
+        password: String(fd.get("password"))
+      });
+      if (error) return toast("Nie udało się zalogować. Sprawdź e-mail i hasło.");
+      await loadSession();
+    });
+    document.getElementById("resetPassword").addEventListener("click", async () => {
+      const email = document.querySelector('[name="email"]').value.trim();
+      if (!email) return toast("Najpierw wpisz adres e-mail.");
+      const {error} = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + location.pathname
+      });
+      toast(error ? "Nie udało się wysłać wiadomości." : "Jeśli konto istnieje, wysłaliśmy instrukcję resetu hasła.");
+    });
+  }
+  const navItems = [
+    ["home","Start","⌂"],["meetings","Zbiórki","▦"],["attendance","Obecności","✓"],
+    ["announcements","Komunikaty","!"],["members","Członkowie","♙"],["account","Konto","⚙"]
+  ];
+  function renderNav() {
+    nav.hidden = false;
+    nav.innerHTML = navItems.map(([id,label,icon]) =>
+      `<button type="button" class="${currentView===id?"active":""}" data-view="${id}"><span>${icon}</span>${label}</button>`
+    ).join("");
+    nav.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => {
+      currentView = b.dataset.view; renderView();
+    }));
+  }
+  async function loadRows(table, orderColumn, ascending=false) {
+    const {data,error} = await supabaseClient.from(table).select("*").order(orderColumn,{ascending});
+    if (error) throw error;
+    return data || [];
+  }
+  async function renderView() {
+    if (!currentUser || !profile) return;
+    roleBadge.textContent = roleName(profile.role);
+    renderNav();
+    try {
+      if (currentView === "home") {
+        const meetings = await loadRows("meetings","meeting_date",false);
+        const announcements = await loadRows("announcements","created_at",false);
+        shell("Cześć!", `
+          <div class="hero panel"><p class="eyebrow">PANEL UŻYTKOWNIKA</p><h2>Witaj w MDP Warszowice</h2><p>Jesteś zalogowany jako ${esc(roleName(profile.role))}.</p></div>
+          <div class="stats-grid">
+            <button class="stat panel" data-go="meetings"><span>Zbiórki</span><strong>${meetings.length}</strong></button>
+            <button class="stat panel" data-go="announcements"><span>Komunikaty</span><strong>${announcements.length}</strong></button>
+          </div>
+          <div class="panel"><h2>Ostatnie komunikaty</h2>${announcements.slice(0,3).map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("") || "<p>Brak komunikatów.</p>"}</div>`);
+        app.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{currentView=b.dataset.go;renderView();}));
+      } else if (currentView === "meetings") {
+        const rows = await loadRows("meetings","meeting_date",false);
+        shell("Zbiórki", `${profile.role==="supervisor"?`<div class="panel"><h2>Dodaj zbiórkę</h2><form id="meetingForm"><label>Nazwa<input name="title" required maxlength="120"></label><label>Data i godzina<input name="meeting_date" type="datetime-local" required></label><label>Miejsce<input name="location" maxlength="120"></label><label>Informacje<textarea name="notes" rows="3"></textarea></label><button class="primary">Zapisz zbiórkę</button></form></div>`:""}
+          <div class="panel">${rows.map(m=>`<article class="list-item"><h3>${esc(m.title)}</h3><p>${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}${m.location?" · "+esc(m.location):""}</p>${m.notes?`<p>${esc(m.notes)}</p>`:""}</article>`).join("")||"<p>Brak zbiórek.</p>"}</div>`);
+        const form=document.getElementById("meetingForm");
+        if(form) form.addEventListener("submit",async e=>{
+          e.preventDefault();const fd=new FormData(form);
+          const {error}=await supabaseClient.from("meetings").insert({title:fd.get("title"),meeting_date:new Date(fd.get("meeting_date")).toISOString(),location:fd.get("location")||null,notes:fd.get("notes")||null,created_by:currentUser.id});
+          if(error)return toast("Nie zapisano zbiórki. Sprawdź uprawnienia.");
+          toast("Zbiórka zapisana.");renderView();
+        });
+      } else if (currentView === "announcements") {
+        const rows = await loadRows("announcements","created_at",false);
+        shell("Komunikaty", `${profile.role==="supervisor"?`<div class="panel"><h2>Nowy komunikat</h2><form id="announcementForm"><label>Tytuł<input name="title" required maxlength="160"></label><label>Treść<textarea name="body" required rows="4"></textarea></label><button class="primary">Opublikuj</button></form></div>`:""}
+          <div class="panel">${rows.map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("")||"<p>Brak komunikatów.</p>"}</div>`);
+        const form=document.getElementById("announcementForm");
+        if(form)form.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(form);const {error}=await supabaseClient.from("announcements").insert({title:fd.get("title"),body:fd.get("body"),created_by:currentUser.id});if(error)return toast("Nie opublikowano. Sprawdź uprawnienia.");toast("Komunikat opublikowany.");renderView();});
+      } else if (currentView === "members") {
+        if(profile.role!=="supervisor"){shell("Członkowie",`<div class="panel"><p>Lista członków jest dostępna tylko w panelu opiekuna. Jeśli potrzebujesz dostępu, skontaktuj się z opiekunem.</p></div>`);return;}
+        const rows=await loadRows("members","full_name",true);
+        shell("Członkowie",`<div class="panel"><h2>Dodaj członka</h2><form id="memberForm"><label>Imię i nazwisko<input name="full_name" required maxlength="160"></label><button class="primary">Dodaj członka</button></form></div><div class="panel">${rows.map(m=>`<article class="list-item"><strong>${esc(m.full_name)}</strong><span class="status">${m.active?"Aktywny":"Nieaktywny"}</span></article>`).join("")||"<p>Brak członków.</p>"}</div>`);
+        document.getElementById("memberForm").addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const {error}=await supabaseClient.from("members").insert({full_name:fd.get("full_name")});if(error)return toast("Nie dodano członka. Sprawdź uprawnienia.");toast("Dodano członka.");renderView();});
+      } else if (currentView === "attendance") {
+        if(profile.role!=="supervisor"){shell("Obecności",`<div class="panel"><p>Historia obecności zostanie pokazana po przypisaniu Twojego konta do dziecka przez opiekuna.</p></div>`);return;}
+        const [members,meetings,rows]=await Promise.all([loadRows("members","full_name",true),loadRows("meetings","meeting_date",false),loadRows("attendance","marked_at",false)]);
+        shell("Obecności",`<div class="panel"><h2>Zaznacz obecność</h2>${!meetings.length||!members.length?"Najpierw dodaj członka i zbiórkę.":`<form id="attendanceForm"><label>Zbiórka<select name="meeting_id" required>${meetings.map(m=>`<option value="${esc(m.id)}">${esc(m.title)} — ${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}</option>`).join("")}</select></label><label>Członek<select name="member_id" required>${members.map(m=>`<option value="${esc(m.id)}">${esc(m.full_name)}</option>`).join("")}</select></label><label>Status<select name="status"><option value="present">Obecny</option><option value="absent">Nieobecny</option><option value="late">Spóźniony</option></select></label><label>Uwagi<textarea name="notes" rows="2"></textarea></label><button class="primary">Zapisz obecność</button></form>`}</div><div class="panel"><h2>Ostatnie wpisy</h2>${rows.slice(0,30).map(r=>{const m=members.find(x=>x.id===r.member_id);const mt=meetings.find(x=>x.id===r.meeting_id);return `<article class="list-item"><strong>${esc(m?.full_name||"Członek")}</strong><p>${esc(mt?.title||"Zbiórka")} · ${({present:"Obecny",absent:"Nieobecny",late:"Spóźniony"})[r.status]}</p></article>`}).join("")||"<p>Brak wpisów.</p>"}</div>`);
+        const form=document.getElementById("attendanceForm");
+        if(form)form.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(form);const row={meeting_id:fd.get("meeting_id"),member_id:fd.get("member_id"),status:fd.get("status"),notes:fd.get("notes")||null,marked_by:currentUser.id,marked_at:new Date().toISOString()};const {error}=await supabaseClient.from("attendance").upsert(row,{onConflict:"meeting_id,member_id"});if(error)return toast("Nie zapisano obecności. Sprawdź uprawnienia.");toast("Obecność zapisana.");renderView();});
+      } else if (currentView === "account") {
+        shell("Konto",`<div class="panel"><p><strong>E-mail:</strong> ${esc(currentUser.email)}</p><p><strong>Rola:</strong> ${esc(roleName(profile.role))}</p><button id="logout" class="secondary">Wyloguj się</button></div>`);
+        document.getElementById("logout").addEventListener("click",async()=>{await supabaseClient.auth.signOut();currentUser=null;profile=null;renderAuth();});
+      }
+    } catch (e) {
+      console.error(e);
+      shell("Nie udało się wczytać danych",`<div class="panel"><p>Nie udało się pobrać danych z bazy. Sprawdź połączenie oraz reguły dostępu RLS.</p><button id="retry" class="primary">Spróbuj ponownie</button></div>`);
+      document.getElementById("retry").addEventListener("click",renderView);
+    }
+  }
+  async function loadSession() {
+    const {data,error}=await supabaseClient.auth.getSession();
+    if(error||!data.session){currentUser=null;profile=null;return renderAuth();}
+    currentUser=data.session.user;
+    const {data:row,error:profileError}=await supabaseClient.from("profiles").select("id,full_name,role").eq("id",currentUser.id).maybeSingle();
+    if(profileError||!row){currentUser=null;profile=null;return renderAuth();}
+    profile=row;
+    currentView="home";
+    await renderView();
+  }
+  async function start() {
+    if(!configured() || !window.supabase?.createClient) return renderSetupError();
+    supabaseClient=window.supabase.createClient(window.MDP_SUPABASE_URL,window.MDP_SUPABASE_PUBLISHABLE_KEY);
+    await loadSession();
+    supabaseClient.auth.onAuthStateChange((_event) => { setTimeout(loadSession,0); });
+  }
+  start();
+})();

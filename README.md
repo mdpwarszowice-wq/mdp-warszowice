@@ -1,29 +1,17 @@
-# MDP Warszowice PWA — prototyp 0.1
-
-To jest progresywną aplikacja webowa (PWA): można ją uruchomić w przeglądarce i dodać do ekranu głównego telefonu. Nie wymaga App Store ani Google Play do samego testowania.
+# MDP Warszowice — prototyp z Supabase
 
 ## Ważne
-- To nadal prototyp interfejsu. Brak prawdziwego logowania, serwera, synchronizacji, push i SMS.
-- Dane przykładowe są w pamięci strony i nie stanowią oficjalnej ewidencji.
-- Przełączanie ról służy wyłącznie demonstracji; nie jest zabezpieczeniem.
-- Nie wpisuj prawdziwych danych dzieci do tej wersji.
+To jest punkt startowy, a nie system gotowy do użycia z prawdziwymi danymi dzieci. Przed wdrożeniem należy wykonać testy RLS i przegląd bezpieczeństwa. Nie dodawaj danych osobowych, dopóki testy nie zostaną zakończone.
 
-## Uruchomienie
-PWA musi być hostowana przez HTTPS, aby instalacja i service worker działały prawidłowo. Można wdrożyć ją na darmowym planie statycznego hostingu, np. GitHub Pages, Cloudflare Pages lub Netlify, zależnie od aktualnych limitów.
-1. Rozpakuj pliki.
-2. Wgraj zawartość folderu do statycznego hostingu z HTTPS.
-3. Otwórz adres na telefonie.
+## Konfiguracja
+1. W `config.js` wpisz Project URL i Publishable key z Supabase. Nigdy nie używaj klucza `secret` ani `service_role` w przeglądarce.
+2. Wgraj wszystkie pliki bezpośrednio do głównego katalogu repozytorium GitHub Pages.
+3. Zaloguj się kontem utworzonym w Supabase Authentication.
+4. Publiczna rejestracja nie jest obsługiwana przez interfejs.
 
-## Dodawanie do ekranu głównego
-- iPhone: otwórz adres w Safari → Udostępnij → Dodaj do ekranu początkowego.
-- Android: otwórz adres w Chrome → menu → Zainstaluj aplikację / Dodaj do ekranu głównego.
-
-## Następny etap
-1. Podłączyć Supabase Auth i bazę danych.
-2. Wdrożyć RLS i role opiekun/członek/rodzic po stronie serwera.
-3. Wprowadzić zaproszenia i potwierdzanie relacji rodzic–dziecko przez opiekuna.
-4. Dodać prawdziwe powiadomienia push i ewentualnie SMS przez dostawcę.
-5. Przetestować działanie na iOS/Android i polityki prywatności dla danych niepełnoletnich.
-
-## Dźwięk syreny
-Ten prototyp nie wysyła powiadomień. Prawdziwy dźwięk push zależy od konfiguracji platformy, uprawnień i ustawień urządzenia; nie można zagwarantować odtworzenia przy wyciszonym telefonie.
+## Ograniczenia tej wersji
+- Opiekun może dodawać członków, zbiórki, obecności i komunikaty, jeśli polityki RLS są poprawnie skonfigurowane.
+- Przypisania rodziców i członków trzeba utworzyć bezpieczną procedurą administracyjną.
+- Nie ma jeszcze panelu do tworzenia kont rodziców ani przypisywania dzieci.
+- Nie ma prawdziwych powiadomień push ani SMS.
+- Nie należy uznawać tej wersji za gotową produkcyjnie bez audytu i testów dostępu.

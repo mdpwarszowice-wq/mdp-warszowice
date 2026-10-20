@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101827">
   <meta name="description" content="Elektroniczny dziennik MDP Warszowice">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -14,11 +14,13 @@
   <header class="topbar">
     <div class="logo">MDP</div>
     <div class="brand"><strong>MDP WARSZOWICE</strong><span>Elektroniczny dziennik</span></div>
-    <span id="roleBadge" class="role-badge">Opiekun</span>
+    <span id="roleBadge" class="role-badge">Niezalogowany</span>
   </header>
   <main id="app" class="app"></main>
-  <nav class="bottom-nav" id="nav"></nav>
+  <nav id="nav" class="bottom-nav" hidden></nav>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
