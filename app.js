@@ -391,7 +391,10 @@ function renderNav() {
                 <strong>${esc(m.full_name)}</strong>
                 <span class="status">${m.active ? "Aktywny" : "Nieaktywny"}</span>
                 <p>
-                  <button class="secondary" type="button" data-edit-member="${esc(m.id)}">Edytuj</button>
+                  
+<button class="secondary" type="button" data-edit-member="${esc(m.id)}">Edytuj</button>
+<button class="secondary" type="button" data-delete-member="${esc(m.id)}">Usuń</button>
+
                 </p>
                 <div id="member-edit-${esc(m.id)}"></div>
               </article>
