@@ -168,7 +168,6 @@ document.getElementById("registerForm").addEventListener("submit", async e => {
       toast(error ? "Nie udało się wysłać wiadomości." : "Jeśli konto istnieje, wysłaliśmy instrukcję resetu hasła.");
     });
   }
-  const navItems = [
 
 const navItems = [
   ["home","Start","⌂"],
