@@ -817,16 +817,15 @@ function renderNav() {
         });
 
       
-} else if (currentView === "account") {
-  shell("Konto", "Twoje dane i ustawienia");
 
-  app.querySelector("[data-content]")?.insertAdjacentHTML("beforeend", `
-    <section class="panel">
-      <h3>Dane użytkownika</h3>
-      <p><strong>Imię i nazwisko:</strong> ${escapeHtml(profile.full_name || "Nie podano")}</p>
-      <p><strong>Rola:</strong> ${escapeHtml(profile.role || "Nieznana")}</p>
+} else if (currentView === "account") {
+  shell("Konto", `
+    <div class="panel">
+      <h2>Dane użytkownika</h2>
+      <p><strong>Imię i nazwisko:</strong> ${esc(profile.full_name || "Nie podano")}</p>
+      <p><strong>Rola:</strong> ${esc(profile.role || "Nieznana")}</p>
       <button type="button" id="logoutButton">Wyloguj się</button>
-    </section>
+    </div>
   `);
 
   app.querySelector("#logoutButton")?.addEventListener("click", async () => {
@@ -837,9 +836,11 @@ function renderNav() {
       return;
     }
 
-    toast("Wylogowano.");
     await loadSession();
   });
+
+} else if (currentView === "approval") {
+
 
 } else if (currentView === "approval") {
 
