@@ -628,13 +628,7 @@ function renderNav() {
 
         shell("Członkowie", `
           <div class="panel">
-            <h2>Dodaj członka</h2>
-            <form id="memberForm">
-              <label>Imię i nazwisko
-                <input name="full_name" required maxlength="160">
-              </label>
-              <button class="primary">Dodaj członka</button>
-            </form>
+            <p>Członkowie pojawiają się na tej liście automatycznie po zatwierdzeniu konta typu „Członek MDP”. Nie dodawaj tutaj osób ręcznie.</p>
           </div>
 
           <div class="panel">
@@ -655,21 +649,6 @@ function renderNav() {
           </div>
         `);
 
-        document.getElementById("memberForm").addEventListener("submit", async e => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-
-          const { error } = await supabaseClient.from("members").insert({
-            full_name: String(fd.get("full_name")).trim()
-          });
-
-          if (error) return toast("Nie dodano członka. Sprawdź uprawnienia.");
-
-          toast("Dodano członka.");
-          renderView();
-        });
-
-       
         app.querySelectorAll("[data-delete-member]").forEach(button => {
     
           
