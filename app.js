@@ -169,14 +169,18 @@ document.getElementById("registerForm").addEventListener("submit", async e => {
     });
   }
   const navItems = [
-    ["home","Start","⌂"],
-    ["meetings","Zbiórki","▦"],
-    ["attendance","Obecności","✓"],
-    ["announcements","Komunikaty","!"],
-    ["members","Członkowie","♙"],
-    ["guardians","Rodzice","♧"],
-    ["account","Konto","⚙"]
-  ];
+
+const navItems = [
+  ["home","Start","⌂"],
+  ["meetings","Zbiórki","▦"],
+  ["attendance","Obecności","✓"],
+  ["announcements","Komunikaty","!"],
+  ["members","Członkowie","♙"],
+  ["guardians","Rodzice","♧"],
+  ["approval","Zatwierdzanie kont","✓"],
+  ["account","Konto","⚙"]
+];
+
 function renderNav() {
   nav.hidden = false;
 
