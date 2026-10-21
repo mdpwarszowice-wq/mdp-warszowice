@@ -47,11 +47,21 @@
       <div class="panel auth-panel">
         <h2>Logowanie</h2>
         <p>Użyj konta utworzonego przez opiekuna MDP Warszowice.</p>
-        <form id="loginForm">
-          <label>Adres e-mail<input name="email" type="email" autocomplete="username" required></label>
-          <label>Hasło<input name="password" type="password" autocomplete="current-password" required></label>
-          <button class="primary" type="submit">Zaloguj się</button>
-        </form>
+       
+<form id="loginForm">
+  <label>Adres e-mail
+    <input name="email" type="email" autocomplete="username" required>
+  </label>
+  <label>Hasło
+    <input name="password" type="password" autocomplete="current-password" required>
+  </label>
+  <button class="primary" type="submit">Zaloguj się</button>
+</form>
+
+<button class="secondary" type="button" id="showRegister">
+  Załóż konto
+</button>
+
         <p class="muted">Nie masz konta? Poproś opiekuna o jego utworzenie. Rejestracja publiczna jest wyłączona.</p>
         <button id="resetPassword" class="secondary" type="button">Nie pamiętam hasła</button>
       </div>`);
