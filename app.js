@@ -186,8 +186,8 @@ function renderNav() {
   const visibleItems = profile.role === "supervisor"
     ? navItems
     : navItems.filter(([id]) =>
-        !["attendance", "members", "guardians"].includes(id)
-      );
+    !["attendance", "members", "guardians", "approval"].includes(id)
+);
 
   nav.innerHTML = visibleItems.map(([id, label, icon]) =>
     `<button type="button" class="${currentView === id ? "active" : ""}" data-view="${id}"><span>${icon}</span>${label}</button>`
