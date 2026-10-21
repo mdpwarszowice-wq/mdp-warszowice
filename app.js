@@ -110,6 +110,55 @@
       if (error) return toast("Nie udało się zalogować. Sprawdź e-mail i hasło.");
       await loadSession();
     });
+    
+document.getElementById("showRegister").addEventListener("click", () => {
+  document.getElementById("registerPanel").hidden = false;
+  document.getElementById("loginForm").hidden = true;
+  document.getElementById("showRegister").hidden = true;
+});
+
+document.getElementById("cancelRegister").addEventListener("click", () => {
+  document.getElementById("registerPanel").hidden = true;
+  document.getElementById("loginForm").hidden = false;
+  document.getElementById("showRegister").hidden = false;
+});
+
+document.getElementById("registerForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  const fd = new FormData(e.currentTarget);
+  const fullName = String(fd.get("full_name")).trim();
+  const email = String(fd.get("email")).trim();
+  const password = String(fd.get("password"));
+  const accountType = String(fd.get("account_type"));
+
+  if (!fullName || !email || password.length < 8) {
+    return toast("Sprawdź dane. Hasło musi mieć co najmniej 8 znaków.");
+  }
+
+  if (!["guardian", "member"].includes(accountType)) {
+    return toast("Wybierz typ konta.");
+  }
+
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+        requested_role: accountType
+      }
+    }
+  });
+
+  if (error) {
+    console.error(error);
+    return toast("Nie udało się założyć konta. Sprawdź dane lub spróbuj później.");
+  }
+
+  toast("Rejestracja wysłana. Sprawdź e-mail i poczekaj na zatwierdzenie konta.");
+});
+
     document.getElementById("resetPassword").addEventListener("click", async () => {
       const email = document.querySelector('[name="email"]').value.trim();
       if (!email) return toast("Najpierw wpisz adres e-mail.");
