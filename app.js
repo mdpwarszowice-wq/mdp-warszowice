@@ -62,6 +62,41 @@
   Załóż konto
 </button>
 
+<div id="registerPanel" class="panel" hidden>
+  <h2>Załóż konto MDP Warszowice</h2>
+
+  <form id="registerForm">
+    <label>Imię i nazwisko
+      <input name="full_name" type="text" autocomplete="name"
+        maxlength="100" required>
+    </label>
+
+    <label>Adres e-mail
+      <input name="email" type="email" autocomplete="email" required>
+    </label>
+
+    <label>Hasło (minimum 8 znaków)
+      <input name="password" type="password"
+        autocomplete="new-password" minlength="8" required>
+    </label>
+
+    <label>Typ konta
+      <select name="account_type" required>
+        <option value="">Wybierz...</option>
+        <option value="guardian">Rodzic / opiekun dziecka</option>
+        <option value="member">Członek MDP</option>
+      </select>
+    </label>
+
+    <button class="primary" type="submit">Zarejestruj się</button>
+    <button class="secondary" type="button" id="cancelRegister">
+      Wróć do logowania
+    </button>
+  </form>
+
+  <p>Po rejestracji konto będzie oczekiwało na zatwierdzenie przez opiekuna MDP.</p>
+</div>
+
         <p class="muted">Nie masz konta? Poproś opiekuna o jego utworzenie. Rejestracja publiczna jest wyłączona.</p>
         <button id="resetPassword" class="secondary" type="button">Nie pamiętam hasła</button>
       </div>`);
