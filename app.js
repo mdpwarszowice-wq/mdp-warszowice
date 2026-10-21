@@ -816,9 +816,33 @@ function renderNav() {
           renderView();
         });
 
-      } else if (currentView === "account") {
-        
+      
+} else if (currentView === "account") {
+  shell("Konto", "Twoje dane i ustawienia");
+
+  app.querySelector("[data-content]")?.insertAdjacentHTML("beforeend", `
+    <section class="panel">
+      <h3>Dane użytkownika</h3>
+      <p><strong>Imię i nazwisko:</strong> ${escapeHtml(profile.full_name || "Nie podano")}</p>
+      <p><strong>Rola:</strong> ${escapeHtml(profile.role || "Nieznana")}</p>
+      <button type="button" id="logoutButton">Wyloguj się</button>
+    </section>
+  `);
+
+  app.querySelector("#logoutButton")?.addEventListener("click", async () => {
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) {
+      toast("Nie udało się wylogować.");
+      return;
+    }
+
+    toast("Wylogowano.");
+    await loadSession();
+  });
+
 } else if (currentView === "approval") {
+
   if (profile.role !== "supervisor") {
     currentView = "home";
     return renderView();
