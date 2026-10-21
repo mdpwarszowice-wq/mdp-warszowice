@@ -242,7 +242,12 @@ function renderNav() {
   ` : ""}
 </div>
 <div class="panel"><h2>Ostatnie komunikaty</h2>${announcements.slice(0,3).map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("") || "<p>Brak komunikatów.</p>"}</div>`);
-        app.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>{currentView=b.dataset.go;renderView();}));
+        app.querySelectorAll("[data-go]").forEach(button => {
+  button.onclick = () => {
+    currentView = button.dataset.go;
+    renderView();
+  };
+});
               } else if (currentView === "childAttendance") {
         if (profile.role !== "guardian") {
           currentView = "home";
