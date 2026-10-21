@@ -97,7 +97,7 @@
   <p>Po rejestracji konto będzie oczekiwało na zatwierdzenie przez opiekuna MDP.</p>
 </div>
 
-        <p class="muted">Nie masz konta? Poproś opiekuna o jego utworzenie. Rejestracja publiczna jest wyłączona.</p>
+     <p class="muted">Nie masz konta? Kliknij „Załóż konto”, aby zarejestrować się w dzienniku MDP Warszowice.</p>
         <button id="resetPassword" class="secondary" type="button">Nie pamiętam hasła</button>
       </div>`);
     document.getElementById("loginForm").addEventListener("submit", async e => {
