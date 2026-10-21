@@ -813,6 +813,69 @@ function renderNav() {
         });
 
       } else if (currentView === "account") {
+        
+} else if (currentView === "approval") {
+  if (profile.role !== "supervisor") {
+    currentView = "home";
+    return renderView();
+  }
+
+  const { data: pending, error } = await supabaseClient
+    .from("profiles")
+    .select("id, full_name, role, created_at")
+    .eq("approved", false)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+
+  shell("Zatwierdzanie kont", `
+    <div class="panel">
+      <h2>Konta oczekujące na zatwierdzenie</h2>
+      ${
+        pending.length
+          ? pending.map(p => `
+            <article class="list-item">
+              <h3>${esc(p.full_name || "Bez imienia i nazwiska")}</h3>
+              <p>Typ konta: ${esc(roleName(p.role))}</p>
+              <p>Data rejestracji: ${esc(
+                new Date(p.created_at).toLocaleDateString("pl-PL")
+              )}</p>
+              <button
+                class="primary"
+                type="button"
+                data-approve-profile="${esc(p.id)}">
+                Zatwierdź konto
+              </button>
+            </article>
+          `).join("")
+          : "<p>Brak kont oczekujących na zatwierdzenie.</p>"
+      }
+    </div>
+  `);
+
+  app.querySelectorAll("[data-approve-profile]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const profileId = button.dataset.approveProfile;
+
+      if (!confirm("Czy na pewno zatwierdzić to konto?")) return;
+
+      button.disabled = true;
+
+      const { error } = await supabaseClient.rpc("approve_profile", {
+        target_profile_id: profileId
+      });
+
+      if (error) {
+        console.error(error);
+        button.disabled = false;
+        return toast("Nie udało się zatwierdzić konta.");
+      }
+
+      toast("Konto zostało zatwierdzone.");
+      renderView();
+    });
+  });
+
         shell("Konto",`<div class="panel"><p><strong>E-mail:</strong> ${esc(currentUser.email)}</p><p><strong>Rola:</strong> ${esc(roleName(profile.role))}</p><button id="logout" class="secondary">Wyloguj się</button></div>`);
         document.getElementById("logout").addEventListener("click",async()=>{await supabaseClient.auth.signOut();currentUser=null;profile=null;renderAuth();});
       }
