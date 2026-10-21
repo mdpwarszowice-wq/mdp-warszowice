@@ -841,9 +841,6 @@ function renderNav() {
 
 } else if (currentView === "approval") {
 
-
-} else if (currentView === "approval") {
-
   if (profile.role !== "supervisor") {
     currentView = "home";
     return renderView();
@@ -905,8 +902,6 @@ function renderNav() {
     });
   });
 
-        shell("Konto",`<div class="panel"><p><strong>E-mail:</strong> ${esc(currentUser.email)}</p><p><strong>Rola:</strong> ${esc(roleName(profile.role))}</p><button id="logout" class="secondary">Wyloguj się</button></div>`);
-        document.getElementById("logout").addEventListener("click",async()=>{await supabaseClient.auth.signOut();currentUser=null;profile=null;renderAuth();});
       }
     } catch (e) {
       console.error(e);
