@@ -433,3 +433,45 @@ code {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* === MDP WARSZOWICE: NOWY MOTYW STRAŻACKI === */
+:root{--bg:#080b12;--panel:#111722;--panel-light:#1a2432;--line:#303b4b;--text:#f8fafc;--muted:#b7c0ce;--accent:#f12d35;--accent-hover:#ff563f;--gold:#ffbd59;--radius:20px}
+html,body{background:#080b12}
+body{background:radial-gradient(ellipse at 76% 0%,#6d1b1c55 0,transparent 38%),radial-gradient(ellipse at 30% 10%,#e3431720 0,transparent 40%),linear-gradient(145deg,#080b12,#11131b 55%,#090b11);background-attachment:fixed}
+.topbar{padding:13px 24px;background:linear-gradient(100deg,#080b12f5,#16151bf2 60%,#351015f2);border-bottom:1px solid #ff493a65;box-shadow:0 8px 32px #0005;gap:14px}
+.logo{width:52px;height:52px;border-radius:16px;background:linear-gradient(145deg,#ff3e35,#a60c1e);box-shadow:0 0 0 3px #ff50331c,0 0 26px #ff352b42;font-size:1.08rem;letter-spacing:-.06em}
+.brand strong{letter-spacing:.06em}.brand span{color:#c5c9d3}
+.role-badge{border-color:#ff6a4d75;background:#ff452015;color:#ffd0a3}
+.menu-toggle{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid #ffffff20;border-radius:12px;background:#ffffff09;color:white;font-size:1.45rem;cursor:pointer}
+.app{width:min(1440px,100%);margin:0 auto;padding:28px 28px 60px;min-height:calc(100vh - 80px)}
+.page-head{position:relative;margin:5px 0 22px;padding:26px 26px 24px;border:1px solid #ff63462d;border-radius:22px;overflow:hidden;background:linear-gradient(100deg,#111722f2 0%,#151720e8 52%,#3a1216b8 100%),radial-gradient(ellipse at 85% 110%,#ff3c1e70,transparent 55%);box-shadow:0 18px 45px #0004}
+.page-head:after{content:"";position:absolute;right:-20px;bottom:-65px;width:240px;height:190px;pointer-events:none;opacity:.5;background:radial-gradient(ellipse at 50% 100%,#ffb02d88,transparent 42%),radial-gradient(ellipse at 40% 100%,#ef292988,transparent 58%);filter:blur(12px)}
+.eyebrow{color:#ffb18c;letter-spacing:.18em;font-size:.78rem;font-weight:900}
+h1{font-size:clamp(1.8rem,4vw,2.65rem);letter-spacing:-.045em;text-shadow:0 3px 20px #0008}
+.panel{position:relative;overflow:hidden;background:linear-gradient(145deg,#171e2af5,#10151ff5);border:1px solid #ffffff15;border-radius:22px;padding:22px;box-shadow:0 16px 42px #0003}
+.panel h2{color:#fff}.panel p{color:#d2d9e4}
+.hero{border-color:#ff503c70;background:linear-gradient(110deg,#171b27f5 0%,#171721e8 56%,#53171bc9 100%),radial-gradient(ellipse at 90% 90%,#ff492e88,transparent 48%);box-shadow:0 15px 42px #0005, inset 4px 0 #ff3c34}
+.hero:before{content:"🔥";position:absolute;right:26px;top:8px;font-size:clamp(3rem,8vw,6rem);opacity:.2;filter:saturate(1.4);transform:rotate(-9deg);pointer-events:none}
+.stats-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.stat{position:relative;isolation:isolate;min-height:135px;padding:20px;border-radius:19px;background:linear-gradient(135deg,#e92b32 0%,#a51326 58%,#421722 100%);border:1px solid #ff77716b;box-shadow:0 12px 28px #0003;color:white;overflow:hidden}
+.stat:nth-child(3n+2){background:linear-gradient(135deg,#087bd5,#12408e 58%,#15213e);border-color:#56b5ff65}
+.stat:nth-child(3n){background:linear-gradient(135deg,#138b58,#07553e 58%,#102b2b);border-color:#58e1a365}
+.stat:nth-child(6n+4){background:linear-gradient(135deg,#e58b14,#a74a0e 58%,#45251d);border-color:#ffc35c70}
+.stat:nth-child(6n+5){background:linear-gradient(135deg,#873fe2,#4b1b91 58%,#26153f);border-color:#c4a0ff70}
+.stat:nth-child(6n){background:linear-gradient(135deg,#e92b32,#9b1425 58%,#40151e);border-color:#ff77716b}
+.stat:after{content:"";position:absolute;z-index:-1;right:-20px;bottom:-45px;width:155px;height:155px;border-radius:50%;background:radial-gradient(circle,#ffffff24,transparent 68%);box-shadow:0 0 0 20px #ffffff05,0 0 0 40px #ffffff04}
+.stat span{color:#fff;opacity:.9}.stat strong{font-size:2rem;color:#fff}.stat:hover{transform:translateY(-3px);filter:brightness(1.08);border-color:#ffffff9c}
+label{color:#f0f3f8}input,textarea,select{background:#090e17;border-color:#3a4658}button.secondary{background:#202a39;border-color:#414d60}
+.list-item{border-color:#ffffff14}
+.bottom-nav{position:fixed;top:79px;bottom:0;left:0;right:auto;width:258px;z-index:12;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:5px;padding:20px 13px 18px;background:linear-gradient(180deg,#0b0f18f7,#11121af7 70%,#260e13f7);border-top:0;border-right:1px solid #ff493a36;box-shadow:15px 0 45px #0003;overflow-y:auto;overflow-x:hidden;backdrop-filter:blur(20px)}
+.bottom-nav:before{content:"MDP WARSZOWICE";display:block;padding:8px 12px 16px;color:#ffb08d;font-size:.76rem;font-weight:950;letter-spacing:.12em}
+.bottom-nav button{flex:0 0 auto;width:100%;min-width:0;min-height:45px;flex-direction:row;justify-content:flex-start;gap:13px;padding:11px 13px;border-radius:13px;text-align:left;font-size:.88rem;color:#c2cbd8}
+.bottom-nav button span{width:25px;text-align:center;font-size:1.15rem}
+.bottom-nav button.active{color:#fff;background:linear-gradient(100deg,#f22d35,#a81628);border-color:#ff716a70;box-shadow:0 7px 22px #e52e3d25}
+.app{margin-left:258px;width:calc(100% - 258px);max-width:none}
+.nav-backdrop{display:none}
+.toast{bottom:24px;background:#171e2a;border-color:#ff604d70}
+@media(max-width:850px){.topbar{padding:11px 14px}.app{margin-left:0;width:100%;padding:20px 16px 36px}.bottom-nav{top:0;bottom:0;left:0;width:min(300px,84vw);padding:24px 14px;background:linear-gradient(180deg,#090d16f9,#17131af9 75%,#351016fa);transform:translateX(-105%);transition:transform .25s ease;box-shadow:22px 0 55px #0008}.bottom-nav:before{padding-top:58px}.bottom-nav.menu-open{transform:translateX(0)}.nav-backdrop:not([hidden]){display:block;position:fixed;inset:0;background:#0009;backdrop-filter:blur(3px);z-index:11}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.topbar{gap:9px;padding:10px}.menu-toggle{width:38px;height:38px;flex-basis:38px}.logo{width:43px;height:43px;border-radius:13px}.brand strong{font-size:.85rem}.brand span{font-size:.72rem}.role-badge{font-size:.68rem;padding:6px 8px;max-width:100px;overflow:hidden;text-overflow:ellipsis}.app{padding:16px 12px 30px}.page-head{padding:20px 17px;border-radius:18px}.panel{padding:17px;border-radius:18px}.stats-grid{gap:10px}.stat{min-height:115px;padding:14px;border-radius:16px}.stat strong{font-size:1.7rem}.stat span{font-size:.82rem}.hero:before{right:12px;font-size:3.5rem}}
+@media(min-width:851px){.menu-toggle{display:none}.bottom-nav[hidden]{display:none!important}}

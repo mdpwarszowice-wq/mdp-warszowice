@@ -15,3 +15,7 @@ To jest punkt startowy, a nie system gotowy do użycia z prawdziwymi danymi dzie
 - Nie ma jeszcze panelu do tworzenia kont rodziców ani przypisywania dzieci.
 - Nie ma prawdziwych powiadomień push ani SMS.
 - Nie należy uznawać tej wersji za gotową produkcyjnie bez audytu i testów dostępu.
+
+
+## Motyw graficzny
+Wersja zawiera ciemny motyw strażacki, czerwone akcenty, kafelki i menu boczne na komputerze oraz wysuwane menu na telefonie. Funkcje aplikacji i konfiguracja Supabase pozostają w dotychczasowych plikach.

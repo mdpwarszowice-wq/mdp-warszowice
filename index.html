@@ -12,12 +12,14 @@
 </head>
 <body>
   <header class="topbar">
+    <button id="menuToggle" class="menu-toggle" type="button" aria-label="Otwórz menu" aria-expanded="false">☰</button>
     <div class="logo">MDP</div>
     <div class="brand"><strong>MDP WARSZOWICE</strong><span>Elektroniczny dziennik</span></div>
     <span id="roleBadge" class="role-badge">Niezalogowany</span>
   </header>
-  <main id="app" class="app"></main>
+  <div id="navBackdrop" class="nav-backdrop" hidden></div>
   <nav id="nav" class="bottom-nav" hidden></nav>
+  <main id="app" class="app"></main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js"></script>

@@ -3,6 +3,21 @@
   const nav = document.getElementById("nav");
   const roleBadge = document.getElementById("roleBadge");
   const toastEl = document.getElementById("toast");
+  const menuToggle = document.getElementById("menuToggle");
+  const navBackdrop = document.getElementById("navBackdrop");
+  function closeMenu() {
+    nav.classList.remove("menu-open");
+    if (navBackdrop) navBackdrop.hidden = true;
+    if (menuToggle) menuToggle.setAttribute("aria-expanded", "false");
+  }
+  if (menuToggle) menuToggle.addEventListener("click", () => {
+    const open = !nav.classList.contains("menu-open");
+    nav.classList.toggle("menu-open", open);
+    if (navBackdrop) navBackdrop.hidden = !open;
+    menuToggle.setAttribute("aria-expanded", String(open));
+  });
+  if (navBackdrop) navBackdrop.addEventListener("click", closeMenu);
+
   let supabaseClient = null;
   let currentUser = null;
   let profile = null;
@@ -196,6 +211,7 @@ function renderNav() {
   nav.querySelectorAll("[data-view]").forEach(b =>
     b.addEventListener("click", () => {
       currentView = b.dataset.view;
+      closeMenu();
       renderView();
     })
   );
@@ -245,6 +261,7 @@ function renderNav() {
         app.querySelectorAll("[data-go]").forEach(button => {
   button.onclick = () => {
     currentView = button.dataset.go;
+    closeMenu();
     renderView();
   };
 });
