@@ -33,12 +33,72 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3500);
   }
+  // Syrena dźwiękowa uruchamiana wyłącznie po kliknięciu alarmowego powiadomienia.
+  // To nie zastępuje systemowego alarmowania; przeglądarka może blokować audio.
+  async function playUrgentSiren() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      await ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(650, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(1050, ctx.currentTime + 0.65);
+      osc.frequency.linearRampToValueAtTime(650, ctx.currentTime + 1.3);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.22, ctx.currentTime + 1.2);
+      gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 1.45);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 1.5);
+      osc.onended = () => ctx.close();
+    } catch (err) { console.warn("Przeglądarka zablokowała dźwięk alarmu:", err); }
+  }
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", event => {
+      if (event.data?.type === "MDP_PLAY_URGENT_SIREN") playUrgentSiren();
+    });
+  }
+
   function configured() {
     return window.MDP_SUPABASE_URL &&
       !window.MDP_SUPABASE_URL.includes("WKLEJ_TUTAJ") &&
       window.MDP_SUPABASE_PUBLISHABLE_KEY &&
       !window.MDP_SUPABASE_PUBLISHABLE_KEY.includes("WKLEJ_TUTAJ");
   }
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+  }
+  async function enableMemberPush() {
+    if (profile?.role !== "member") return toast("Powiadomienia zbiórek są przeznaczone tylko dla członków MDP.");
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !window.Notification) {
+      return toast("Ta przeglądarka nie obsługuje powiadomień push. Spróbuj w Chrome lub Safari po dodaniu aplikacji do ekranu początkowego.");
+    }
+    if (!window.MDP_VAPID_PUBLIC_KEY || window.MDP_VAPID_PUBLIC_KEY.includes("WKLEJ")) {
+      return toast("Powiadomienia wymagają jeszcze konfiguracji klucza VAPID. Instrukcja jest w ZIP-ie.");
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return toast("Nie udzielono zgody na powiadomienia.");
+      const registration = await navigator.serviceWorker.register("./sw.js");
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(window.MDP_VAPID_PUBLIC_KEY)
+      });
+      const json = subscription.toJSON();
+      const { error } = await supabaseClient.from("push_subscriptions").upsert({
+        user_id: currentUser.id, endpoint: json.endpoint, subscription: json
+      }, { onConflict: "endpoint" });
+      if (error) { console.error(error); return toast("Nie zapisano subskrypcji. Uruchom skrypt SQL z ZIP-a."); }
+      toast("Powiadomienia o zbiórkach zostały włączone.");
+    } catch (error) { console.error(error); toast("Nie udało się włączyć powiadomień. Sprawdź zgodę przeglądarki i konfigurację."); }
+  }
+
   function roleName(role) {
     return ({supervisor:"Opiekun", guardian:"Rodzic", member:"Członek MDP"})[role] || "Użytkownik";
   }
@@ -363,6 +423,14 @@ function renderNav() {
             </form>
           </div>
 
+          <div class="panel urgent-call-panel">
+            <h2>🚨 Nagłe wezwanie MDP</h2>
+            <p>Wyślij osobny alarm do zatwierdzonych członków MDP. Rodzice nie otrzymają tego powiadomienia.</p>
+            <label>Treść wezwania<input id="urgentCallMessage" maxlength="180" value="Pilne wezwanie do remizy. Sprawdź szczegóły i skontaktuj się z opiekunem." required></label>
+            <button class="danger" id="sendUrgentCall" type="button">🚨 WYŚLIJ NAGŁE WEZWANIE</button>
+            <p class="muted">Syrena może zostać odtworzona po otwarciu powiadomienia. System iOS/Android nie gwarantuje dźwięku syreny w tle.</p>
+          </div>
+
           <div class="panel">
             <h2>Zaplanowane zbiórki</h2>
             ${rows.map(m => `
@@ -380,6 +448,21 @@ function renderNav() {
           </div>
         `);
 
+        const urgentButton = document.getElementById("sendUrgentCall");
+        urgentButton?.addEventListener("click", async () => {
+          if (profile?.role !== "supervisor") return toast("Tylko opiekun może wysłać nagłe wezwanie.");
+          const message = document.getElementById("urgentCallMessage")?.value.trim();
+          if (!message) return toast("Wpisz treść nagłego wezwania.");
+          if (!confirm("Wysłać NAGŁE WEZWANIE do wszystkich zatwierdzonych członków MDP? Rodzice nie będą odbiorcami.")) return;
+          urgentButton.disabled = true;
+          const { data, error } = await supabaseClient.functions.invoke("send-meeting-push", {
+            body: { type: "urgent", title: "NAGŁE WEZWANIE MDP", message }
+          });
+          urgentButton.disabled = false;
+          if (error) { console.error(error); return toast("Nie udało się wysłać alarmu. Sprawdź konfigurację push."); }
+          toast(`Nagłe wezwanie wysłane. Dostarczono do urządzeń: ${data?.sent ?? 0}.`);
+        });
+
         const form = document.getElementById("meetingForm");
 
         form.addEventListener("submit", async e => {
@@ -396,7 +479,12 @@ function renderNav() {
 
           if (error) return toast("Nie zapisano zbiórki. Sprawdź uprawnienia.");
 
-          toast("Zbiórka zapisana.");
+          // Wysyłka jest wykonywana po stronie Supabase Edge Function; jej brak nie cofa zbiórki.
+          const { error: pushError } = await supabaseClient.functions.invoke("send-meeting-push", {
+            body: { type: "planned", title: String(fd.get("title")), meeting_date: new Date(fd.get("meeting_date")).toISOString(), location: String(fd.get("location") || ""), notes: String(fd.get("notes") || "") }
+          });
+          if (pushError) console.warn("Powiadomienie push nie zostało wysłane:", pushError);
+          toast(pushError ? "Zbiórka zapisana, ale powiadomienia push nie są jeszcze skonfigurowane." : "Zbiórka zapisana. Wysłano zwykłe powiadomienie do członków MDP.");
           renderView();
         });
 
@@ -820,9 +908,12 @@ function renderNav() {
       <h2>Dane użytkownika</h2>
       <p><strong>Imię i nazwisko:</strong> ${esc(profile.full_name || "Nie podano")}</p>
       <p><strong>Rola:</strong> ${esc(profile.role || "Nieznana")}</p>
+      ${profile.role === "member" ? '<button type="button" class="primary" id="enablePushButton">Włącz powiadomienia o zbiórkach</button><p class="muted">Powiadomienia są wysyłane tylko na konta członków MDP. Rodzice nie otrzymują syreny.</p>' : ''}
       <button type="button" id="logoutButton">Wyloguj się</button>
     </div>
   `);
+
+  app.querySelector("#enablePushButton")?.addEventListener("click", enableMemberPush);
 
   app.querySelector("#logoutButton")?.addEventListener("click", async () => {
     const { error } = await supabaseClient.auth.signOut();
@@ -916,6 +1007,7 @@ function renderNav() {
     await renderView();
   }
   async function start() {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(err => console.warn("Service worker:", err));
     if(!configured() || !window.supabase?.createClient) return renderSetupError();
     supabaseClient=window.supabase.createClient(window.MDP_SUPABASE_URL,window.MDP_SUPABASE_PUBLISHABLE_KEY);
     await loadSession();
