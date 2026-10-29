@@ -455,8 +455,12 @@ function renderNav() {
           if (!message) return toast("Wpisz treść nagłego wezwania.");
           if (!confirm("Wysłać NAGŁE WEZWANIE do wszystkich zatwierdzonych członków MDP? Rodzice nie będą odbiorcami.")) return;
           urgentButton.disabled = true;
-          const { data, error } = await supabaseClient.functions.invoke("send-meeting-push", {
-            body: { type: "urgent", title: "NAGŁE WEZWANIE MDP", message }
+          const { data, error } = await supabaseClient.functions.invoke("send-emergency", {
+            body: {
+              title: "NAGŁE WEZWANIE MDP",
+              body: message,
+              url: "/"
+            }
           });
           urgentButton.disabled = false;
           if (error) { console.error(error); return toast("Nie udało się wysłać alarmu. Sprawdź konfigurację push."); }
