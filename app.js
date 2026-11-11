@@ -115,6 +115,29 @@
         <p>Nie używaj klucza <code>secret</code> ani <code>service_role</code>. Zapisz plik, wgraj go do głównego katalogu repozytorium GitHub i odśwież tę stronę.</p>
       </div>`);
   }
+  function renderPendingApproval() {
+  roleBadge.textContent = "Oczekuje na akceptację";
+  nav.hidden = true;
+
+  shell("Konto oczekuje na zatwierdzenie", `
+    <div class="panel auth-panel">
+      <h2>Witaj w MDP Warszowice!</h2>
+      <p>Twoje konto zostało utworzone.</p>
+      <p>Oczekuje teraz na zatwierdzenie przez opiekuna MDP.</p>
+      <p>Gdy opiekun zaakceptuje konto, będziesz mógł korzystać z aplikacji.</p>
+      <button class="primary" id="logoutPending" type="button">
+        Wyloguj się
+      </button>
+    </div>
+  `);
+
+  document.getElementById("logoutPending").addEventListener("click", async () => {
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    profile = null;
+    renderAuth();
+  });
+}
   function renderAuth() {
     roleBadge.textContent = "Niezalogowany";
     nav.hidden = true;
