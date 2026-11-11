@@ -94,7 +94,10 @@
       const { error } = await supabaseClient.from("push_subscriptions").upsert({
         user_id: currentUser.id, endpoint: json.endpoint, subscription: json
       }, { onConflict: "endpoint" });
-      if (error) { console.error(error); return toast("Nie zapisano subskrypcji. Uruchom skrypt SQL z ZIP-a."); }
+      if (error) {
+  console.error("BŁĄD ZAPISU PUSH:", error);
+  return toast("Błąd zapisu: " + error.message);
+}
       toast("Powiadomienia o zbiórkach zostały włączone.");
     } catch (error) { console.error(error); toast("Nie udało się włączyć powiadomień. Sprawdź zgodę przeglądarki i konfigurację."); }
   }
