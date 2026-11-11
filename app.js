@@ -75,7 +75,7 @@
     return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
   }
   async function enableMemberPush() {
-    if (profile?.role !== "member") return toast("Powiadomienia zbiórek są przeznaczone tylko dla członków MDP.");
+    if (!["member", "guardian"].includes(profile?.role)) return toast("Ta funkcja jest dostępna dla członków MDP i rodziców.");
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !window.Notification) {
       return toast("Ta przeglądarka nie obsługuje powiadomień push. Spróbuj w Chrome lub Safari po dodaniu aplikacji do ekranu początkowego.");
     }
