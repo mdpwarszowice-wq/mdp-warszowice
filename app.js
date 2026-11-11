@@ -33,8 +33,8 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3500);
   }
-  // Syrena dźwiękowa uruchamiana wyłącznie po kliknięciu alarmowego powiadomienia.
-  // To nie zastępuje systemowego alarmowania; przeglądarka może blokować audio.
+  // Syrena uruchamiana po odebraniu alarmu, gdy aplikacja jest aktywna,
+  // oraz po kliknięciu powiadomienia. Przeglądarka może blokować audio.
   async function playUrgentSiren() {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -58,7 +58,9 @@
   }
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("message", event => {
-      if (event.data?.type === "MDP_PLAY_URGENT_SIREN") playUrgentSiren();
+      if (event.data?.type === "MDP_PLAY_URGENT_SIREN" || event.data?.type === "MDP_URGENT_PUSH_RECEIVED") {
+        playUrgentSiren();
+      }
     });
   }
 
