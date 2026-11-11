@@ -347,6 +347,9 @@ const navItems = [
   ["meetings","Zbiórki","▦"],
   ["attendance","Obecności","✓"],
   ["announcements","Komunikaty","!"],
+  ["files","Pliki","📁"],
+  ["gallery","Galeria","🖼"],
+  ["chat","Czat","💬"],
   ["members","Członkowie","♙"],
   ["guardians","Rodzice","♧"],
   ["approval","Zatwierdzanie kont","✓"],
@@ -824,6 +827,208 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
       renderView();
       });
   });
+
+
+      } else if (currentView === "files") {
+        const { data: files, error } = await supabaseClient
+          .from("mdp_files").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        const canManage = profile.role === "supervisor";
+        shell("Pliki i dokumenty", `
+          ${canManage ? `<div class="panel">
+            <h2>Dodaj dokument</h2>
+            <form id="mdpFileForm">
+              <label>Nazwa dokumentu<input name="title" maxlength="140" required></label>
+              <label>Opis<textarea name="description" rows="2"></textarea></label>
+              <label>Plik (PDF, DOC, DOCX, XLS, XLSX, JPG, PNG; maks. 20 MB)
+                <input name="file" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" required>
+              </label>
+              <button class="primary" type="submit">Dodaj plik</button>
+            </form>
+          </div>` : ""}
+          <div class="panel">
+            <h2>Dostępne dokumenty</h2>
+            ${files?.length ? files.map(f => `
+              <article class="list-item">
+                <h3>📄 ${esc(f.title)}</h3>
+                ${f.description ? `<p>${esc(f.description)}</p>` : ""}
+                <small>${esc(f.file_name)} · ${esc(new Date(f.created_at).toLocaleString("pl-PL"))}</small>
+                <p><button class="secondary" type="button" data-file-open="${esc(f.id)}">Otwórz / pobierz</button>
+                ${canManage ? `<button class="secondary" type="button" data-file-delete="${esc(f.id)}">Usuń</button>` : ""}</p>
+              </article>`).join("") : "<p>Nie dodano jeszcze dokumentów.</p>"}
+          </div>
+        `);
+        const form = document.getElementById("mdpFileForm");
+        if (form) form.addEventListener("submit", async e => {
+          e.preventDefault();
+          const fd = new FormData(form);
+          const file = fd.get("file");
+          if (!file || !file.size) return toast("Wybierz plik.");
+          if (file.size > 20 * 1024 * 1024) return toast("Plik jest większy niż 20 MB.");
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const path = `documents/${currentUser.id}/${Date.now()}_${safeName}`;
+          const { error: uploadError } = await supabaseClient.storage.from("mdp-shared").upload(path, file, { upsert: false });
+          if (uploadError) return toast("Nie udało się wgrać pliku: " + uploadError.message);
+          const { error: rowError } = await supabaseClient.from("mdp_files").insert({
+            title: String(fd.get("title")).trim(), description: String(fd.get("description") || "").trim() || null,
+            storage_path: path, file_name: file.name, content_type: file.type || "application/octet-stream",
+            created_by: currentUser.id
+          });
+          if (rowError) {
+            await supabaseClient.storage.from("mdp-shared").remove([path]);
+            return toast("Plik wgrano, ale nie zapisano opisu: " + rowError.message);
+          }
+          toast("Dokument został dodany."); renderView();
+        });
+        app.querySelectorAll("[data-file-open]").forEach(button => button.addEventListener("click", async () => {
+          const row = files.find(x => x.id === button.dataset.fileOpen);
+          if (!row) return;
+          const { data, error } = await supabaseClient.storage.from("mdp-shared").createSignedUrl(row.storage_path, 300);
+          if (error) return toast("Nie udało się otworzyć pliku.");
+          window.open(data.signedUrl, "_blank", "noopener");
+        }));
+        app.querySelectorAll("[data-file-delete]").forEach(button => button.addEventListener("click", async () => {
+          const row = files.find(x => x.id === button.dataset.fileDelete);
+          if (!row || !confirm("Usunąć ten dokument?")) return;
+          const { error: storageError } = await supabaseClient.storage.from("mdp-shared").remove([row.storage_path]);
+          if (storageError) return toast("Nie udało się usunąć pliku ze schowka.");
+          const { error } = await supabaseClient.from("mdp_files").delete().eq("id", row.id);
+          if (error) return toast("Nie udało się usunąć wpisu dokumentu.");
+          toast("Dokument usunięty."); renderView();
+        }));
+
+      } else if (currentView === "gallery") {
+        const { data: photos, error } = await supabaseClient
+          .from("mdp_photos").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        const canManage = profile.role === "supervisor";
+        shell("Galeria zdjęć", `
+          ${canManage ? `<div class="panel">
+            <h2>Dodaj zdjęcia</h2>
+            <form id="mdpPhotoForm">
+              <label>Opis / nazwa albumu<input name="title" maxlength="140" required></label>
+              <label>Wybierz zdjęcia (JPG, PNG, WEBP; maks. 10 MB każde)
+                <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+              </label>
+              <button class="primary" type="submit">Wgraj zdjęcia</button>
+            </form>
+          </div>` : ""}
+          <div class="photo-grid">
+            ${photos?.length ? photos.map(p => `
+              <article class="photo-card">
+                <img src="" alt="${esc(p.title)}" data-photo-image="${esc(p.id)}" loading="lazy">
+                <div><strong>${esc(p.title)}</strong><small>${esc(new Date(p.created_at).toLocaleDateString("pl-PL"))}</small>
+                ${canManage ? `<button class="secondary" type="button" data-photo-delete="${esc(p.id)}">Usuń</button>` : ""}</div>
+              </article>`).join("") : `<div class="panel"><p>Galeria jest jeszcze pusta.</p></div>`}
+          </div>
+        `);
+        for (const photo of photos || []) {
+          const img = app.querySelector(`[data-photo-image="${CSS.escape(photo.id)}"]`);
+          const { data } = await supabaseClient.storage.from("mdp-shared").createSignedUrl(photo.storage_path, 3600);
+          if (img && data?.signedUrl) img.src = data.signedUrl;
+        }
+        const form = document.getElementById("mdpPhotoForm");
+        if (form) form.addEventListener("submit", async e => {
+          e.preventDefault();
+          const fd = new FormData(form);
+          const selected = Array.from(fd.getAll("photos")).filter(f => f && f.size);
+          if (!selected.length) return toast("Wybierz przynajmniej jedno zdjęcie.");
+          if (selected.some(f => f.size > 10 * 1024 * 1024)) return toast("Jedno ze zdjęć przekracza 10 MB.");
+          for (const file of selected) {
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const path = `photos/${currentUser.id}/${Date.now()}_${Math.random().toString(36).slice(2)}_${safeName}`;
+            const { error: uploadError } = await supabaseClient.storage.from("mdp-shared").upload(path, file, { upsert: false });
+            if (uploadError) return toast("Błąd wgrywania zdjęcia: " + uploadError.message);
+            const { error: rowError } = await supabaseClient.from("mdp_photos").insert({
+              title: String(fd.get("title")).trim(), storage_path: path, file_name: file.name, created_by: currentUser.id
+            });
+            if (rowError) return toast("Zdjęcie wgrano, ale nie zapisano go w galerii: " + rowError.message);
+          }
+          toast("Zdjęcia dodane do galerii."); renderView();
+        });
+        app.querySelectorAll("[data-photo-delete]").forEach(button => button.addEventListener("click", async () => {
+          const row = photos.find(x => x.id === button.dataset.photoDelete);
+          if (!row || !confirm("Usunąć to zdjęcie?")) return;
+          const { error: storageError } = await supabaseClient.storage.from("mdp-shared").remove([row.storage_path]);
+          if (storageError) return toast("Nie udało się usunąć zdjęcia.");
+          const { error } = await supabaseClient.from("mdp_photos").delete().eq("id", row.id);
+          if (error) return toast("Nie udało się usunąć wpisu zdjęcia.");
+          toast("Zdjęcie usunięte."); renderView();
+        }));
+
+      } else if (currentView === "chat") {
+        const isSupervisor = profile.role === "supervisor";
+        const room = isSupervisor ? (window.mdpChatRoom || "members") :
+          (profile.role === "guardian" ? "parents" : "members");
+        const [contactsResult, messagesResult] = await Promise.all([
+          supabaseClient.from("profiles").select("id,full_name,role").in("role", isSupervisor ? ["guardian","member"] : ["supervisor"]).eq("approved", true).order("full_name"),
+          supabaseClient.from("mdp_chat_messages").select("*").order("created_at", { ascending: true }).limit(250)
+        ]);
+        if (contactsResult.error) throw contactsResult.error;
+        if (messagesResult.error) throw messagesResult.error;
+        const contacts = contactsResult.data || [];
+        const supervisors = isSupervisor ? [] : contacts;
+        const allMessages = messagesResult.data || [];
+        const selectedRoom = isSupervisor ? (window.mdpChatRoom || "members") : room;
+        const visibleMessages = allMessages.filter(m =>
+          m.message_type === "room" ? m.room === selectedRoom :
+          (m.sender_id === currentUser.id || m.recipient_id === currentUser.id ||
+           (isSupervisor && (m.sender_id === currentUser.id || supervisors.some(s => s.id === m.recipient_id))))
+        );
+        shell("Czat", `
+          <div class="panel">
+            <h2>Rozmowy</h2>
+            ${isSupervisor ? `<label>Pokój grupowy<select id="chatRoomSelect">
+              <option value="members" ${selectedRoom==="members"?"selected":""}>Członkowie MDP</option>
+              <option value="parents" ${selectedRoom==="parents"?"selected":""}>Rodzice</option>
+              <option value="supervisors" ${selectedRoom==="supervisors"?"selected":""}>Opiekunowie</option>
+            </select></label>` : `<p>Pokój: <strong>${room==="parents"?"Rodzice":"Członkowie MDP"}</strong></p>`}
+            <label>Wiadomość prywatna do opiekuna<select id="chatDirectSupervisor">
+              <option value="">Wybierz opiekuna (opcjonalnie)</option>
+              ${contacts.map(s => `<option value="${esc(s.id)}">${esc(s.full_name || (isSupervisor ? "Użytkownik" : "Opiekun"))} · ${esc(s.role === "guardian" ? "Rodzic" : s.role === "member" ? "Członek MDP" : "Opiekun")}</option>`).join("")}
+            </select></label>
+          </div>
+          <div class="panel chat-panel">
+            <div id="chatMessages" class="chat-messages">
+              ${visibleMessages.map(m => {
+                const direct = m.message_type === "direct";
+                const author = m.sender_id === currentUser.id ? "Ty" : (m.sender_name || "Użytkownik");
+                return `<article class="chat-message ${m.sender_id===currentUser.id?"mine":""}">
+                  <small>${esc(author)} · ${esc(new Date(m.created_at).toLocaleString("pl-PL"))}${direct?" · prywatna":""}</small>
+                  <p>${esc(m.body)}</p>
+                </article>`;
+              }).join("") || "<p>Brak wiadomości. Rozpocznij rozmowę.</p>"}
+            </div>
+            <form id="chatForm">
+              <label>Treść wiadomości<textarea name="body" rows="3" maxlength="2000" required placeholder="Napisz wiadomość..."></textarea></label>
+              <button class="primary" type="submit">Wyślij wiadomość</button>
+            </form>
+          </div>
+        `);
+        const roomSelect = document.getElementById("chatRoomSelect");
+        roomSelect?.addEventListener("change", () => { window.mdpChatRoom = roomSelect.value; renderView(); });
+        document.getElementById("chatForm").addEventListener("submit", async e => {
+          e.preventDefault();
+          const form = e.currentTarget;
+          const body = String(new FormData(form).get("body") || "").trim();
+          if (!body) return;
+          const directTo = document.getElementById("chatDirectSupervisor")?.value || "";
+          const payload = {
+            message_type: directTo ? "direct" : "room",
+            room: directTo ? null : selectedRoom,
+            recipient_id: directTo || null,
+            body
+          };
+          const { error } = await supabaseClient.from("mdp_chat_messages").insert(payload);
+          if (error) return toast("Nie udało się wysłać wiadomości: " + error.message);
+          toast("Wiadomość wysłana."); renderView();
+        });
+        // Realtime refreshes the currently selected conversation when a new message arrives.
+        const chatChannel = supabaseClient.channel("mdp-chat-" + currentUser.id + "-" + Date.now())
+          .on("postgres_changes", { event: "INSERT", schema: "public", table: "mdp_chat_messages" }, () => {
+            if (currentView === "chat") renderView();
+          }).subscribe();
+        window.addEventListener("beforeunload", () => { supabaseClient.removeChannel(chatChannel); }, { once: true });
 
 } else if (currentView === "members") {
         if (profile.role !== "supervisor") {
