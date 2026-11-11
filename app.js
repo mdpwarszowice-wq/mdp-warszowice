@@ -249,11 +249,10 @@ document.getElementById("registerForm").addEventListener("submit", async e => {
     }
   });
 
-  if (error) {
-    console.error(error);
-    return toast("Nie udało się założyć konta. Sprawdź dane lub spróbuj później.");
-  }
-
+if (error) {
+    console.error("BŁĄD REJESTRACJI:", error);
+    return toast("Błąd rejestracji: " + error.message);
+}
  toast("Konto zostało utworzone. Możesz się zalogować, ale poczekaj na zatwierdzenie przez opiekuna MDP.");
 });
 
