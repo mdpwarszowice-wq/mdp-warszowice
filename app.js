@@ -90,10 +90,15 @@
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(window.MDP_VAPID_PUBLIC_KEY)
       });
-      const json = subscription.toJSON();
-      const { error } = await supabaseClient.from("push_subscriptions").upsert({
-        user_id: currentUser.id, endpoint: json.endpoint, subscription: json
-      }, { onConflict: "endpoint" });
+    const json = subscription.toJSON();
+
+const { error } = await supabaseClient
+  .from("push_subscriptions")
+  .insert({
+    user_id: currentUser.id,
+    endpoint: json.endpoint,
+    subscription: json
+  });
       if (error) {
   console.error("BŁĄD ZAPISU PUSH:", error);
   return toast("Błąd zapisu: " + error.message);
