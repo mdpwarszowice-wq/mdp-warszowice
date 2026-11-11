@@ -517,8 +517,12 @@ button.danger:disabled { opacity: .6; cursor: wait; }
 
 
 /* Podgląd zdjęcia na pełnym ekranie */
-.photo-lightbox{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:56px 18px 18px;background:rgba(0,0,0,.94);cursor:zoom-out}
-.photo-lightbox img{display:block;max-width:100%;max-height:calc(100vh - 76px);width:auto;height:auto;object-fit:contain;border-radius:8px;box-shadow:0 12px 50px #0009;cursor:default}
-.photo-lightbox-close{position:absolute;top:12px;right:16px;width:46px;height:46px;border:1px solid #ffffff55;border-radius:50%;background:#20242c;color:#fff;font-size:32px;line-height:1;cursor:pointer}
+.photo-open{display:block;width:100%;padding:0;border:0;border-radius:0;background:transparent;overflow:hidden;cursor:zoom-in;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.photo-open img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#090e17;pointer-events:none}
+.photo-open:focus-visible{outline:3px solid #60a5fa;outline-offset:-3px}
+body.photo-view-open{overflow:hidden!important;touch-action:none}
+.photo-lightbox{position:fixed!important;inset:0!important;z-index:2147483000!important;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100vw;height:100vh;height:100dvh;min-height:100%;padding:calc(env(safe-area-inset-top) + 64px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px);margin:0;background:rgba(0,0,0,.97);overscroll-behavior:contain;touch-action:pan-x pan-y}
+.photo-lightbox img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;border-radius:5px;box-shadow:0 12px 50px #0009;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;touch-action:pinch-zoom}
+.photo-lightbox-close{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 12px);z-index:1;width:48px;height:48px;padding:0;border:1px solid #ffffff66;border-radius:50%;background:#20242c;color:#fff;font-size:34px;line-height:1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .photo-lightbox-close:hover{background:#3a414d}
-.photo-card img:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
+@media(max-width:600px){.photo-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.photo-lightbox{padding-top:calc(env(safe-area-inset-top) + 66px)}}
