@@ -912,7 +912,7 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
       <h2>Dane użytkownika</h2>
       <p><strong>Imię i nazwisko:</strong> ${esc(profile.full_name || "Nie podano")}</p>
       <p><strong>Rola:</strong> ${esc(profile.role || "Nieznana")}</p>
-      ${profile.role === "member" ? '<button type="button" class="primary" id="enablePushButton">Włącz powiadomienia o zbiórkach</button><p class="muted">Powiadomienia są wysyłane tylko na konta członków MDP. Rodzice nie otrzymują syreny.</p>' : ''}
+      ${["member", "guardian"].includes(profile.role) ? '<button type="button" class="primary" id="enablePushButton">Włącz powiadomienia o zbiórkach</button><p class="muted">Otrzymasz zwykłe powiadomienia o zaplanowanych zbiórkach.</p>' : ''}
       <button type="button" id="logoutButton">Wyloguj się</button>
     </div>
   `);
