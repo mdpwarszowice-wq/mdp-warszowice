@@ -947,6 +947,38 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
           const { data } = await supabaseClient.storage.from("mdp-shared").createSignedUrl(photo.storage_path, 3600);
           if (img && data?.signedUrl) img.src = data.signedUrl;
         }
+        // Otwieranie zdjęcia w pełnym ekranie (lightbox)
+        const openPhotoFullscreen = (src, alt) => {
+          if (!src) return;
+          document.getElementById("mdpPhotoLightbox")?.remove();
+          const overlay = document.createElement("div");
+          overlay.id = "mdpPhotoLightbox";
+          overlay.className = "photo-lightbox";
+          overlay.innerHTML = `
+            <button type="button" class="photo-lightbox-close" aria-label="Zamknij zdjęcie">×</button>
+            <img src="${esc(src)}" alt="${esc(alt || "Zdjęcie z galerii")}">
+          `;
+          document.body.appendChild(overlay);
+          const close = () => overlay.remove();
+          overlay.querySelector(".photo-lightbox-close").addEventListener("click", close);
+          overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
+          const onKey = event => {
+            if (event.key === "Escape") { close(); document.removeEventListener("keydown", onKey); }
+          };
+          document.addEventListener("keydown", onKey);
+        };
+        app.querySelectorAll("[data-photo-image]").forEach(img => {
+          img.style.cursor = "zoom-in";
+          img.setAttribute("role", "button");
+          img.setAttribute("tabindex", "0");
+          img.setAttribute("aria-label", "Otwórz zdjęcie na pełnym ekranie");
+          img.addEventListener("click", () => openPhotoFullscreen(img.src, img.alt));
+          img.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault(); openPhotoFullscreen(img.src, img.alt);
+            }
+          });
+        });
         app.querySelectorAll("[data-album-open]").forEach(button => button.addEventListener("click", () => {
           window.mdpSelectedAlbum = button.dataset.albumOpen; renderView();
         }));
