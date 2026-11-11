@@ -1042,9 +1042,9 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
         const room = isSupervisor ? (window.mdpChatRoom || "members") :
           (profile.role === "guardian" ? "parents" : "members");
         const [contactsResult, messagesResult, authorsResult] = await Promise.all([
-          supabaseClient.from("profiles").select("id,full_name,role").in("role", isSupervisor ? ["guardian","member"] : ["supervisor"]).eq("approved", true).order("full_name"),
+          supabaseClient.from("mdp_chat_authors").select("id,full_name,role").in("role", isSupervisor ? ["guardian","member"] : ["supervisor"]).order("full_name"),
           supabaseClient.from("mdp_chat_messages").select("*").order("created_at", { ascending: true }).limit(250),
-          supabaseClient.from("profiles").select("id,full_name,role").eq("approved", true)
+          supabaseClient.from("mdp_chat_authors").select("id,full_name,role")
         ]);
         if (contactsResult.error) throw contactsResult.error;
         if (messagesResult.error) throw messagesResult.error;
