@@ -1004,8 +1004,14 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
     const {data,error}=await supabaseClient.auth.getSession();
     if(error||!data.session){currentUser=null;profile=null;return renderAuth();}
     currentUser=data.session.user;
-    const {data:row,error:profileError}=await supabaseClient.from("profiles").select("id,full_name,role").eq("id",currentUser.id).maybeSingle();
+    const {data:row,error:profileError}=await supabaseClient.from("profiles").select("id,full_name,role,approved").eq("id",currentUser.id).maybeSingle();
     if(profileError||!row){currentUser=null;profile=null;return renderAuth();}
+    if (row.approved !== true) {
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  profile = null;
+  return renderPendingApproval();
+}
     profile=row;
     currentView="home";
     await renderView();
