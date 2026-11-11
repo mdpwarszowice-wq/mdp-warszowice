@@ -921,11 +921,14 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
             <div class="panel album-heading">
               <button class="secondary" id="galleryBack" type="button">← Wszystkie albumy</button>
               <h2>${esc(selectedAlbum)}</h2>
+              ${canManage ? `<button class="secondary" id="renameAlbum" type="button">Zmień nazwę albumu</button>` : ""}
               <small>${albumPhotos.length} ${albumPhotos.length === 1 ? "zdjęcie" : "zdjęć"}</small>
             </div>
             <div class="photo-grid">
               ${albumPhotos.map(p => `<article class="photo-card">
-                <img src="" alt="${esc(p.title)}" data-photo-image="${esc(p.id)}" loading="lazy">
+                <button class="photo-open" type="button" data-photo-open="${esc(p.id)}" aria-label="Otwórz zdjęcie ${esc(p.file_name || p.title)} na pełnym ekranie">
+                  <img src="" alt="${esc(p.title)}" data-photo-image="${esc(p.id)}" loading="lazy">
+                </button>
                 <div><strong>${esc(p.file_name || p.title)}</strong><small>${esc(new Date(p.created_at).toLocaleDateString("pl-PL"))}</small>
                 ${canManage ? `<button class="secondary" type="button" data-photo-delete="${esc(p.id)}">Usuń</button>` : ""}</div>
               </article>`).join("") || `<div class="panel"><p>Ten album jest pusty.</p></div>`}
@@ -947,37 +950,58 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
           const { data } = await supabaseClient.storage.from("mdp-shared").createSignedUrl(photo.storage_path, 3600);
           if (img && data?.signedUrl) img.src = data.signedUrl;
         }
-        // Otwieranie zdjęcia w pełnym ekranie (lightbox)
+        // Pełnoekranowy podgląd: otwierany z prawdziwego przycisku, także na ekranach dotykowych.
         const openPhotoFullscreen = (src, alt) => {
-          if (!src) return;
+          if (!src || src === window.location.href) return;
           document.getElementById("mdpPhotoLightbox")?.remove();
           const overlay = document.createElement("div");
           overlay.id = "mdpPhotoLightbox";
           overlay.className = "photo-lightbox";
-          overlay.innerHTML = `
-            <button type="button" class="photo-lightbox-close" aria-label="Zamknij zdjęcie">×</button>
-            <img src="${esc(src)}" alt="${esc(alt || "Zdjęcie z galerii")}">
-          `;
+          overlay.setAttribute("role", "dialog");
+          overlay.setAttribute("aria-modal", "true");
+          overlay.setAttribute("aria-label", "Podgląd zdjęcia");
+          const image = document.createElement("img");
+          image.alt = alt || "Zdjęcie z galerii";
+          image.src = src;
+          image.draggable = false;
+          const closeButton = document.createElement("button");
+          closeButton.type = "button";
+          closeButton.className = "photo-lightbox-close";
+          closeButton.setAttribute("aria-label", "Zamknij zdjęcie");
+          closeButton.textContent = "×";
+          overlay.append(closeButton, image);
           document.body.appendChild(overlay);
-          const close = () => overlay.remove();
-          overlay.querySelector(".photo-lightbox-close").addEventListener("click", close);
-          overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
-          const onKey = event => {
-            if (event.key === "Escape") { close(); document.removeEventListener("keydown", onKey); }
+          document.body.classList.add("photo-view-open");
+          const close = () => {
+            overlay.remove();
+            document.body.classList.remove("photo-view-open");
+            document.removeEventListener("keydown", onKey);
           };
+          const onKey = event => { if (event.key === "Escape") close(); };
+          closeButton.addEventListener("click", close);
+          overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
           document.addEventListener("keydown", onKey);
+          closeButton.focus({preventScroll:true});
         };
-        app.querySelectorAll("[data-photo-image]").forEach(img => {
-          img.style.cursor = "zoom-in";
-          img.setAttribute("role", "button");
-          img.setAttribute("tabindex", "0");
-          img.setAttribute("aria-label", "Otwórz zdjęcie na pełnym ekranie");
-          img.addEventListener("click", () => openPhotoFullscreen(img.src, img.alt));
-          img.addEventListener("keydown", event => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault(); openPhotoFullscreen(img.src, img.alt);
-            }
+        app.querySelectorAll("[data-photo-open]").forEach(button => {
+          button.addEventListener("click", event => {
+            event.preventDefault();
+            const img = button.querySelector("img");
+            if (!img?.src || !img.complete) return toast("Zdjęcie jeszcze się ładuje. Spróbuj ponownie za chwilę.");
+            openPhotoFullscreen(img.currentSrc || img.src, img.alt);
           });
+        });
+        const renameAlbumButton = document.getElementById("renameAlbum");
+        if (canManage && renameAlbumButton) renameAlbumButton.addEventListener("click", async () => {
+          const nextTitle = prompt("Podaj nową nazwę albumu:", selectedAlbum);
+          if (nextTitle === null) return;
+          const cleaned = nextTitle.trim();
+          if (!cleaned) return toast("Nazwa albumu nie może być pusta.");
+          const { error: renameError } = await supabaseClient.from("mdp_photos").update({title: cleaned}).eq("title", selectedAlbum);
+          if (renameError) return toast("Nie udało się zmienić nazwy albumu: " + renameError.message);
+          window.mdpSelectedAlbum = cleaned;
+          toast("Nazwa albumu została zmieniona.");
+          renderView();
         });
         app.querySelectorAll("[data-album-open]").forEach(button => button.addEventListener("click", () => {
           window.mdpSelectedAlbum = button.dataset.albumOpen; renderView();
