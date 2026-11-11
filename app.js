@@ -902,31 +902,55 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
           .from("mdp_photos").select("*").order("created_at", { ascending: false });
         if (error) throw error;
         const canManage = profile.role === "supervisor";
+        const allPhotos = photos || [];
+        const selectedAlbum = window.mdpSelectedAlbum || "";
+        const albums = [...new Set(allPhotos.map(p => p.title || "Bez nazwy"))];
+        const albumPhotos = selectedAlbum ? allPhotos.filter(p => (p.title || "Bez nazwy") === selectedAlbum) : [];
         shell("Galeria zdjęć", `
           ${canManage ? `<div class="panel">
             <h2>Dodaj zdjęcia</h2>
             <form id="mdpPhotoForm">
-              <label>Opis / nazwa albumu<input name="title" maxlength="140" required></label>
+              <label>Nazwa albumu<input name="title" maxlength="140" required placeholder="Np. Zawody gminne 2026"></label>
               <label>Wybierz zdjęcia (JPG, PNG, WEBP; maks. 10 MB każde)
                 <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
               </label>
               <button class="primary" type="submit">Wgraj zdjęcia</button>
             </form>
           </div>` : ""}
-          <div class="photo-grid">
-            ${photos?.length ? photos.map(p => `
-              <article class="photo-card">
+          ${selectedAlbum ? `
+            <div class="panel album-heading">
+              <button class="secondary" id="galleryBack" type="button">← Wszystkie albumy</button>
+              <h2>${esc(selectedAlbum)}</h2>
+              <small>${albumPhotos.length} ${albumPhotos.length === 1 ? "zdjęcie" : "zdjęć"}</small>
+            </div>
+            <div class="photo-grid">
+              ${albumPhotos.map(p => `<article class="photo-card">
                 <img src="" alt="${esc(p.title)}" data-photo-image="${esc(p.id)}" loading="lazy">
-                <div><strong>${esc(p.title)}</strong><small>${esc(new Date(p.created_at).toLocaleDateString("pl-PL"))}</small>
+                <div><strong>${esc(p.file_name || p.title)}</strong><small>${esc(new Date(p.created_at).toLocaleDateString("pl-PL"))}</small>
                 ${canManage ? `<button class="secondary" type="button" data-photo-delete="${esc(p.id)}">Usuń</button>` : ""}</div>
-              </article>`).join("") : `<div class="panel"><p>Galeria jest jeszcze pusta.</p></div>`}
-          </div>
+              </article>`).join("") || `<div class="panel"><p>Ten album jest pusty.</p></div>`}
+            </div>` : `
+            <div class="album-grid">
+              ${albums.length ? albums.map(title => {
+                const items = allPhotos.filter(p => (p.title || "Bez nazwy") === title);
+                const cover = items[0];
+                return `<button class="album-card" type="button" data-album-open="${esc(title)}">
+                  <span class="album-cover"><img src="" alt="" data-album-cover="${esc(cover.id)}" loading="lazy"></span>
+                  <span class="album-card-info"><strong>${esc(title)}</strong><small>${items.length} ${items.length === 1 ? "zdjęcie" : "zdjęć"}</small></span>
+                </button>`;
+              }).join("") : `<div class="panel"><p>Galeria jest jeszcze pusta.</p></div>`}
+            </div>`}
         `);
-        for (const photo of photos || []) {
-          const img = app.querySelector(`[data-photo-image="${CSS.escape(photo.id)}"]`);
+        const imageRows = selectedAlbum ? albumPhotos : albums.map(title => allPhotos.find(p => (p.title || "Bez nazwy") === title)).filter(Boolean);
+        for (const photo of imageRows) {
+          const img = app.querySelector(`[data-photo-image="${CSS.escape(photo.id)}"], [data-album-cover="${CSS.escape(photo.id)}"]`);
           const { data } = await supabaseClient.storage.from("mdp-shared").createSignedUrl(photo.storage_path, 3600);
           if (img && data?.signedUrl) img.src = data.signedUrl;
         }
+        app.querySelectorAll("[data-album-open]").forEach(button => button.addEventListener("click", () => {
+          window.mdpSelectedAlbum = button.dataset.albumOpen; renderView();
+        }));
+        document.getElementById("galleryBack")?.addEventListener("click", () => { window.mdpSelectedAlbum = ""; renderView(); });
         const form = document.getElementById("mdpPhotoForm");
         if (form) form.addEventListener("submit", async e => {
           e.preventDefault();
@@ -944,10 +968,11 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
             });
             if (rowError) return toast("Zdjęcie wgrano, ale nie zapisano go w galerii: " + rowError.message);
           }
-          toast("Zdjęcia dodane do galerii."); renderView();
+          window.mdpSelectedAlbum = String(fd.get("title")).trim();
+          toast("Zdjęcia dodane do albumu."); renderView();
         });
         app.querySelectorAll("[data-photo-delete]").forEach(button => button.addEventListener("click", async () => {
-          const row = photos.find(x => x.id === button.dataset.photoDelete);
+          const row = albumPhotos.find(x => x.id === button.dataset.photoDelete);
           if (!row || !confirm("Usunąć to zdjęcie?")) return;
           const { error: storageError } = await supabaseClient.storage.from("mdp-shared").remove([row.storage_path]);
           if (storageError) return toast("Nie udało się usunąć zdjęcia.");
@@ -960,13 +985,17 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
         const isSupervisor = profile.role === "supervisor";
         const room = isSupervisor ? (window.mdpChatRoom || "members") :
           (profile.role === "guardian" ? "parents" : "members");
-        const [contactsResult, messagesResult] = await Promise.all([
+        const [contactsResult, messagesResult, authorsResult] = await Promise.all([
           supabaseClient.from("profiles").select("id,full_name,role").in("role", isSupervisor ? ["guardian","member"] : ["supervisor"]).eq("approved", true).order("full_name"),
-          supabaseClient.from("mdp_chat_messages").select("*").order("created_at", { ascending: true }).limit(250)
+          supabaseClient.from("mdp_chat_messages").select("*").order("created_at", { ascending: true }).limit(250),
+          supabaseClient.from("profiles").select("id,full_name,role").eq("approved", true)
         ]);
         if (contactsResult.error) throw contactsResult.error;
         if (messagesResult.error) throw messagesResult.error;
+        if (authorsResult.error) throw authorsResult.error;
         const contacts = contactsResult.data || [];
+        const authors = new Map((authorsResult.data || []).map(p => [p.id, p]));
+        const roleLabel = role => role === "supervisor" ? "Opiekun" : role === "guardian" ? "Rodzic" : role === "member" ? "Członek MDP" : "Użytkownik";
         const supervisors = isSupervisor ? [] : contacts;
         const allMessages = messagesResult.data || [];
         const selectedRoom = isSupervisor ? (window.mdpChatRoom || "members") : room;
@@ -983,7 +1012,7 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
               <option value="parents" ${selectedRoom==="parents"?"selected":""}>Rodzice</option>
               <option value="supervisors" ${selectedRoom==="supervisors"?"selected":""}>Opiekunowie</option>
             </select></label>` : `<p>Pokój: <strong>${room==="parents"?"Rodzice":"Członkowie MDP"}</strong></p>`}
-            <label>Wiadomość prywatna do opiekuna<select id="chatDirectSupervisor">
+            <label>${isSupervisor ? "Wiadomość prywatna do członka lub rodzica" : "Wiadomość prywatna do opiekuna"}<select id="chatDirectSupervisor">
               <option value="">Wybierz opiekuna (opcjonalnie)</option>
               ${contacts.map(s => `<option value="${esc(s.id)}">${esc(s.full_name || (isSupervisor ? "Użytkownik" : "Opiekun"))} · ${esc(s.role === "guardian" ? "Rodzic" : s.role === "member" ? "Członek MDP" : "Opiekun")}</option>`).join("")}
             </select></label>
@@ -992,9 +1021,11 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
             <div id="chatMessages" class="chat-messages">
               ${visibleMessages.map(m => {
                 const direct = m.message_type === "direct";
-                const author = m.sender_id === currentUser.id ? "Ty" : (m.sender_name || "Użytkownik");
+                const sender = authors.get(m.sender_id);
+                const author = m.sender_id === currentUser.id ? "Ty" : (sender?.full_name || "Użytkownik");
+                const senderRole = sender ? roleLabel(sender.role) : "Nieznana rola";
                 return `<article class="chat-message ${m.sender_id===currentUser.id?"mine":""}">
-                  <small>${esc(author)} · ${esc(new Date(m.created_at).toLocaleString("pl-PL"))}${direct?" · prywatna":""}</small>
+                  <small>${esc(author)} · ${esc(senderRole)} · ${esc(new Date(m.created_at).toLocaleString("pl-PL"))}${direct?" · prywatna":""}</small>
                   <p>${esc(m.body)}</p>
                 </article>`;
               }).join("") || "<p>Brak wiadomości. Rozpocznij rozmowę.</p>"}
