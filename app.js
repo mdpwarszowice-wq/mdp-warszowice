@@ -33,14 +33,46 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3500);
   }
-  // Syrena uruchamiana po odebraniu alarmu, gdy aplikacja jest aktywna,
-  // oraz po kliknięciu powiadomienia. Przeglądarka może blokować audio.
+  // Audio musi zostać odblokowane gestem użytkownika (dotknięciem ekranu).
+  // Późniejsze odtworzenie po push może zadziałać, gdy aplikacja jest widoczna,
+  // ale iOS nadal może je zablokować po uśpieniu/zablokowaniu urządzenia.
+  let urgentAudioContext = null;
+  let urgentAudioUnlocked = false;
+
+  async function unlockUrgentAudio() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!urgentAudioContext) urgentAudioContext = new AudioCtx();
+      await urgentAudioContext.resume();
+      // Cichy bufor uruchomiony w ramach gestu pomaga odblokować Web Audio na iOS.
+      const buffer = urgentAudioContext.createBuffer(1, 1, urgentAudioContext.sampleRate);
+      const source = urgentAudioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(urgentAudioContext.destination);
+      source.start(0);
+      urgentAudioUnlocked = urgentAudioContext.state === "running";
+    } catch (err) {
+      console.warn("Nie udało się odblokować dźwięku alarmu:", err);
+    }
+  }
+
+  // Pierwsze dotknięcie/kliknięcie/klawisz w aplikacji odblokowuje dźwięk.
+  document.addEventListener("pointerdown", unlockUrgentAudio, { passive: true });
+  document.addEventListener("touchend", unlockUrgentAudio, { passive: true });
+  document.addEventListener("keydown", unlockUrgentAudio);
+
   async function playUrgentSiren() {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      await ctx.resume();
+      if (!urgentAudioContext) urgentAudioContext = new AudioCtx();
+      if (urgentAudioContext.state !== "running") await urgentAudioContext.resume();
+      if (urgentAudioContext.state !== "running") {
+        console.warn("Dźwięk alarmu nie został odblokowany przez system.");
+        return;
+      }
+      const ctx = urgentAudioContext;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sawtooth";
@@ -53,7 +85,7 @@
       gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 1.45);
       osc.connect(gain); gain.connect(ctx.destination);
       osc.start(); osc.stop(ctx.currentTime + 1.5);
-      osc.onended = () => ctx.close();
+      osc.onended = () => { osc.disconnect(); gain.disconnect(); };
     } catch (err) { console.warn("Przeglądarka zablokowała dźwięk alarmu:", err); }
   }
   if ("serviceWorker" in navigator) {
