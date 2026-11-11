@@ -231,7 +231,7 @@ document.getElementById("registerForm").addEventListener("submit", async e => {
     return toast("Nie udało się założyć konta. Sprawdź dane lub spróbuj później.");
   }
 
-  toast("Rejestracja wysłana. Sprawdź e-mail i poczekaj na zatwierdzenie konta.");
+ toast("Konto zostało utworzone. Możesz się zalogować, ale poczekaj na zatwierdzenie przez opiekuna MDP.");
 });
 
     document.getElementById("resetPassword").addEventListener("click", async () => {
