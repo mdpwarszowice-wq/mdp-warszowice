@@ -74,38 +74,72 @@
     const raw = atob(base64);
     return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
   }
-  async function enableMemberPush() {
-    if (!["member", "guardian"].includes(profile?.role)) return toast("Ta funkcja jest dostępna dla członków MDP i rodziców.");
-    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !window.Notification) {
-      return toast("Ta przeglądarka nie obsługuje powiadomień push. Spróbuj w Chrome lub Safari po dodaniu aplikacji do ekranu początkowego.");
+  
+async function enableMemberPush() {
+  if (!["member", "guardian"].includes(profile?.role)) {
+    return toast("Ta funkcja jest dostępna dla członków MDP i rodziców.");
+  }
+
+  if (!("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !window.Notification) {
+    return toast("Ta przeglądarka nie obsługuje powiadomień push.");
+  }
+
+  if (!window.MDP_VAPID_PUBLIC_KEY ||
+      window.MDP_VAPID_PUBLIC_KEY.includes("WKLEJ")) {
+    return toast("Brak konfiguracji klucza VAPID.");
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+
+    if (permission !== "granted") {
+      return toast("Nie udzielono zgody na powiadomienia.");
     }
-    if (!window.MDP_VAPID_PUBLIC_KEY || window.MDP_VAPID_PUBLIC_KEY.includes("WKLEJ")) {
-      return toast("Powiadomienia wymagają jeszcze konfiguracji klucza VAPID. Instrukcja jest w ZIP-ie.");
+
+    const registration = await navigator.serviceWorker.register("./sw.js");
+    await navigator.serviceWorker.ready;
+
+    // Usunięcie starej subskrypcji korzystającej ze starego klucza VAPID.
+    const oldSubscription = await registration.pushManager.getSubscription();
+
+    if (oldSubscription) {
+      await oldSubscription.unsubscribe();
     }
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") return toast("Nie udzielono zgody na powiadomienia.");
-      const registration = await navigator.serviceWorker.register("./sw.js");
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(window.MDP_VAPID_PUBLIC_KEY)
-      });
+
+    // Utworzenie nowej subskrypcji z aktualnym kluczem VAPID.
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(
+        window.MDP_VAPID_PUBLIC_KEY
+      )
+    });
+
     const json = subscription.toJSON();
 
-const { error } = await supabaseClient
-  .from("push_subscriptions")
-  .insert({
-    user_id: currentUser.id,
-    endpoint: json.endpoint,
-    subscription: json
-  });
-      if (error) {
-  console.error("BŁĄD ZAPISU PUSH:", error);
-  return toast("Błąd zapisu: " + error.message);
-}
-      toast("Powiadomienia o zbiórkach zostały włączone.");
-    } catch (error) { console.error(error); toast("Nie udało się włączyć powiadomień. Sprawdź zgodę przeglądarki i konfigurację."); }
+    const { error } = await supabaseClient
+      .from("push_subscriptions")
+      .upsert({
+        user_id: currentUser.id,
+        endpoint: json.endpoint,
+        subscription: json
+      }, {
+        onConflict: "endpoint"
+      });
+
+    if (error) {
+      console.error("BŁĄD ZAPISU PUSH:", error);
+      return toast("Błąd zapisu subskrypcji: " + error.message);
+    }
+
+    toast("Nowe powiadomienia zostały skonfigurowane.");
+
+  } catch (error) {
+    console.error("BŁĄD KONFIGURACJI PUSH:", error);
+    toast("Nie udało się skonfigurować powiadomień: " + error.message);
   }
+}
 
   function roleName(role) {
     return ({supervisor:"Opiekun", guardian:"Rodzic", member:"Członek MDP"})[role] || "Użytkownik";
