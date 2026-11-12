@@ -1220,9 +1220,25 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
             recipient_id: directTo || null,
             body
           };
-          const { error } = await supabaseClient.from("mdp_chat_messages").insert(payload);
+          const { data: insertedMessage, error } = await supabaseClient
+            .from("mdp_chat_messages")
+            .insert(payload)
+            .select("id")
+            .single();
           if (error) return toast("Nie udało się wysłać wiadomości: " + error.message);
-          toast("Wiadomość wysłana."); renderView();
+
+          // Natychmiastowe powiadomienie push jest uruchamiane po stronie serwera.
+          // Nie blokujemy zapisu wiadomości, jeśli chwilowo wystąpi błąd powiadomienia.
+          const { data: pushResult, error: pushError } = await supabaseClient.functions.invoke("send-chat-push", {
+            body: { message_id: insertedMessage.id }
+          });
+          if (pushError || pushResult?.error) {
+            console.error("Błąd powiadomienia czatu:", pushError || pushResult?.error);
+            toast("Wiadomość wysłana, ale powiadomienie push nie dotarło. Sprawdź wdrożenie funkcji send-chat-push.");
+          } else {
+            toast("Wiadomość wysłana.");
+          }
+          renderView();
         });
         // Realtime refreshes the currently selected conversation when a new message arrives.
         const chatChannel = supabaseClient.channel("mdp-chat-" + currentUser.id + "-" + Date.now())
