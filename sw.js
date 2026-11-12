@@ -1,4 +1,4 @@
-const CACHE_NAME = "mdp-warszowice-v9";
+const CACHE_NAME = "mdp-warszowice-v10";
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll([
