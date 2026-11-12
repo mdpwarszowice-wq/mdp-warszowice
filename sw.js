@@ -1,4 +1,4 @@
-const CACHE_NAME = "mdp-warszowice-v5";
+const CACHE_NAME = "mdp-warszowice-v9";
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll([
@@ -23,38 +23,33 @@ self.addEventListener("push", event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) {}
 
-  const urgent = data.type === "urgent";
-  const title = data.title || (urgent ? "🚨 NAGŁE WEZWANIE MDP" : "Zbiórka MDP");
+  const type = data.type || "planned";
+  const urgent = type === "urgent";
+  const title = data.title || (urgent ? "🚨 NAGŁE WEZWANIE MDP" : "MDP Warszowice");
   const options = {
-    body: data.body || (urgent
-      ? "Pilne wezwanie. Otwórz powiadomienie, aby zobaczyć szczegóły."
-      : "Masz informację o planowanej zbiórce."),
+    body: data.body || (urgent ? "Pilne wezwanie. Otwórz powiadomienie, aby zobaczyć szczegóły." : "Masz nową informację w aplikacji MDP Warszowice."),
     icon: "./icon.png",
     badge: "./icon.svg",
-    tag: data.tag || (urgent ? "mdp-urgent-call" : "mdp-planned-meeting"),
+    tag: data.tag || `mdp-${type}-${Date.now()}`,
     renotify: true,
-    data: { url: data.url || "./", type: urgent ? "urgent" : "planned" },
-    vibrate: urgent ? [500, 150, 500, 150, 900] : [150]
+    data: { url: data.url || "./", type },
+    vibrate: urgent ? [500, 150, 500, 150, 900] : [150, 80, 150]
   };
 
   event.waitUntil((async () => {
     await self.registration.showNotification(title, options);
-
-    // Jeśli aplikacja jest aktualnie otwarta i widoczna, poproś ją o syrenę.
-    // W tle system pokaże powiadomienie; PWA nie może zagwarantować audio w tle.
     if (urgent) {
       const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of clients) {
-        if (client.visibilityState === "visible") {
-          client.postMessage({ type: "MDP_URGENT_PUSH_RECEIVED" });
-        }
+        if (client.visibilityState === "visible") client.postMessage({ type: "MDP_URGENT_PUSH_RECEIVED" });
       }
     }
   })());
 });
 
 self.addEventListener("notificationclick", event => {
-  const urgent = event.notification.data?.type === "urgent";
+  const notificationType = event.notification.data?.type || "planned";
+  const urgent = notificationType === "urgent";
   event.notification.close();
   const target = new URL(event.notification.data?.url || "./", self.location.origin).href;
 
