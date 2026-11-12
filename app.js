@@ -21,7 +21,8 @@
   let supabaseClient = null;
   let currentUser = null;
   let profile = null;
-  let currentView = "home";
+  const requestedView = new URLSearchParams(location.search).get("view");
+  let currentView = ["home", "meetings", "attendance", "files", "gallery", "chat"].includes(requestedView) ? requestedView : "home";
   let toastTimer;
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({
@@ -110,8 +111,8 @@
   }
   
 async function enableMemberPush() {
-  if (!["member", "guardian"].includes(profile?.role)) {
-    return toast("Ta funkcja jest dostępna dla członków MDP i rodziców.");
+  if (!["supervisor", "member", "guardian"].includes(profile?.role)) {
+    return toast("Nie można włączyć powiadomień dla tego konta.");
   }
 
   if (!("serviceWorker" in navigator) ||
@@ -181,6 +182,94 @@ async function enableMemberPush() {
   function shell(title, body) {
     app.innerHTML = `<section class="page-head"><div><p class="eyebrow">MDP WARSZOWICE</p><h1>${esc(title)}</h1></div></section>${body}`;
   }
+  // Zmniejsza duże zdjęcia przed wysłaniem do Supabase Storage.
+  async function compressGalleryImage(file) {
+    const maxDimension = 2560;
+    const targetBytes = 22 * 1024 * 1024; // zapas względem limitu bucketu 25 MB
+    let bitmap = null;
+    let source = null;
+    let width = 0;
+    let height = 0;
+
+    try {
+      if ("createImageBitmap" in window) {
+        bitmap = await createImageBitmap(file);
+        source = bitmap;
+        width = bitmap.width;
+        height = bitmap.height;
+      }
+    } catch (_) {}
+
+    if (!source) {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        image.src = objectUrl;
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = () => reject(new Error("Przeglądarka nie potrafi odczytać tego formatu zdjęcia."));
+        });
+        source = image;
+        width = image.naturalWidth;
+        height = image.naturalHeight;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    if (!width || !height) {
+      bitmap?.close?.();
+      throw new Error("Nie udało się odczytać zdjęcia. Jeśli to plik ProRAW/DNG, wyeksportuj go z iPhone’a jako JPEG.");
+    }
+
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) {
+      bitmap?.close?.();
+      throw new Error("Nie można przygotować zdjęcia do kompresji.");
+    }
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    bitmap?.close?.();
+
+    const toBlob = quality => new Promise((resolve, reject) => {
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Kompresja zdjęcia nie powiodła się.")), "image/jpeg", quality);
+    });
+
+    let quality = 0.88;
+    let blob = await toBlob(quality);
+    while (blob.size > targetBytes && quality > 0.55) {
+      quality = Math.max(0.55, quality - 0.08);
+      blob = await toBlob(quality);
+    }
+
+    if (blob.size > targetBytes) {
+      const smaller = document.createElement("canvas");
+      const factor = Math.sqrt(targetBytes / blob.size) * 0.92;
+      smaller.width = Math.max(1, Math.round(canvas.width * factor));
+      smaller.height = Math.max(1, Math.round(canvas.height * factor));
+      const smallerContext = smaller.getContext("2d", { alpha: false });
+      smallerContext.drawImage(canvas, 0, 0, smaller.width, smaller.height);
+      blob = await new Promise((resolve, reject) => {
+        smaller.toBlob(result => result ? resolve(result) : reject(new Error("Nie udało się zmniejszyć zdjęcia.")), "image/jpeg", 0.72);
+      });
+    }
+
+    if (blob.size > targetBytes) {
+      throw new Error("Po kompresji zdjęcie nadal jest za duże. Zapisz je jako zwykły JPEG i spróbuj ponownie.");
+    }
+
+    const originalBase = file.name.replace(/\.[^.]+$/, "") || "zdjecie";
+    return new File([blob], `${originalBase}.jpg`, {
+      type: "image/jpeg",
+      lastModified: Date.now()
+    });
+  }
+
   function renderSetupError() {
     roleBadge.textContent = "Konfiguracja";
     nav.hidden = true;
@@ -417,6 +506,12 @@ function renderNav() {
       <span>Członkowie</span>
     </button>
   ` : ""}
+</div>
+<div class="home-quick-grid">
+  <button type="button" class="home-quick-tile" data-go="chat"><span class="home-quick-icon">💬</span><strong>Czat</strong><small>Wiadomości drużyny</small></button>
+  <button type="button" class="home-quick-tile" data-go="meetings"><span class="home-quick-icon">🗓️</span><strong>Kalendarz zbiórek</strong><small>Terminy i informacje</small></button>
+  <button type="button" class="home-quick-tile" data-go="files"><span class="home-quick-icon">📁</span><strong>Pliki</strong><small>Dokumenty i materiały</small></button>
+  <button type="button" class="home-quick-tile" data-go="gallery"><span class="home-quick-icon">🖼️</span><strong>Galeria</strong><small>Zdjęcia z działalności</small></button>
 </div>
 <div class="panel"><h2>Ostatnie komunikaty</h2>${announcements.slice(0,3).map(a=>`<article class="list-item"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><small>${esc(new Date(a.created_at).toLocaleString("pl-PL"))}</small></article>`).join("") || "<p>Brak komunikatów.</p>"}</div>`);
         app.querySelectorAll("[data-go]").forEach(button => {
@@ -911,8 +1006,8 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
             <h2>Dodaj zdjęcia</h2>
             <form id="mdpPhotoForm">
               <label>Nazwa albumu<input name="title" maxlength="140" required placeholder="Np. Zawody gminne 2026"></label>
-              <label>Wybierz zdjęcia (JPG, PNG, WEBP; maks. 10 MB każde)
-                <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+              <label>Wybierz zdjęcia (JPG, PNG, WEBP, HEIC; aplikacja automatycznie zmniejszy duże zdjęcia do maks. 22 MB)
+                <input name="photos" type="file" accept="image/*,.heic,.heif,.dng" multiple required>
               </label>
               <button class="primary" type="submit">Wgraj zdjęcia</button>
             </form>
@@ -1013,19 +1108,35 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
           const fd = new FormData(form);
           const selected = Array.from(fd.getAll("photos")).filter(f => f && f.size);
           if (!selected.length) return toast("Wybierz przynajmniej jedno zdjęcie.");
-          if (selected.some(f => f.size > 10 * 1024 * 1024)) return toast("Jedno ze zdjęć przekracza 10 MB.");
-          for (const file of selected) {
-            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-            const path = `photos/${currentUser.id}/${Date.now()}_${Math.random().toString(36).slice(2)}_${safeName}`;
-            const { error: uploadError } = await supabaseClient.storage.from("mdp-shared").upload(path, file, { upsert: false });
-            if (uploadError) return toast("Błąd wgrywania zdjęcia: " + uploadError.message);
-            const { error: rowError } = await supabaseClient.from("mdp_photos").insert({
-              title: String(fd.get("title")).trim(), storage_path: path, file_name: file.name, created_by: currentUser.id
-            });
-            if (rowError) return toast("Zdjęcie wgrano, ale nie zapisano go w galerii: " + rowError.message);
+          const submitButton = form.querySelector('button[type="submit"]');
+          if (submitButton) { submitButton.disabled = true; submitButton.textContent = "Przygotowuję zdjęcia…"; }
+          const albumTitle = String(fd.get("title")).trim();
+          try {
+            for (let index = 0; index < selected.length; index++) {
+              const originalFile = selected[index];
+              toast(`Kompresuję zdjęcie ${index + 1} z ${selected.length}…`);
+              const file = await compressGalleryImage(originalFile);
+              const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+              const path = `photos/${currentUser.id}/${Date.now()}_${Math.random().toString(36).slice(2)}_${safeName}`;
+              if (submitButton) submitButton.textContent = `Wysyłam ${index + 1}/${selected.length}…`;
+              const { error: uploadError } = await supabaseClient.storage.from("mdp-shared").upload(path, file, { upsert: false, contentType: "image/jpeg" });
+              if (uploadError) throw new Error("Błąd wgrywania zdjęcia: " + uploadError.message);
+              const { error: rowError } = await supabaseClient.from("mdp_photos").insert({
+                title: albumTitle, storage_path: path, file_name: originalFile.name, created_by: currentUser.id
+              });
+              if (rowError) {
+                await supabaseClient.storage.from("mdp-shared").remove([path]);
+                throw new Error("Zdjęcie wgrano, ale nie zapisano go w galerii: " + rowError.message);
+              }
+            }
+            window.mdpSelectedAlbum = albumTitle;
+            toast("Zdjęcia skompresowane i dodane do albumu.");
+            renderView();
+          } catch (uploadFlowError) {
+            console.error("Błąd dodawania zdjęcia:", uploadFlowError);
+            toast(uploadFlowError.message || "Nie udało się dodać zdjęcia.");
+            if (submitButton) { submitButton.disabled = false; submitButton.textContent = "Wgraj zdjęcia"; }
           }
-          window.mdpSelectedAlbum = String(fd.get("title")).trim();
-          toast("Zdjęcia dodane do albumu."); renderView();
         });
         app.querySelectorAll("[data-photo-delete]").forEach(button => button.addEventListener("click", async () => {
           const row = albumPhotos.find(x => x.id === button.dataset.photoDelete);
@@ -1050,7 +1161,10 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
         if (messagesResult.error) throw messagesResult.error;
         if (authorsResult.error) throw authorsResult.error;
         const contacts = contactsResult.data || [];
-        const authors = new Map((authorsResult.data || []).map(p => [p.id, p]));
+        // Normalizujemy UUID, aby porównanie nadawcy z profilem było odporne
+        // na różnice formatu zwrócone przez klienta/API.
+        const normalizeUserId = value => String(value || "").trim().toLowerCase();
+        const authors = new Map((authorsResult.data || []).map(p => [normalizeUserId(p.id), p]));
         const roleLabel = role => role === "supervisor" ? "Opiekun" : role === "guardian" ? "Rodzic" : role === "member" ? "Członek MDP" : "Użytkownik";
         const supervisors = isSupervisor ? [] : contacts;
         const allMessages = messagesResult.data || [];
@@ -1077,7 +1191,7 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
             <div id="chatMessages" class="chat-messages">
               ${visibleMessages.map(m => {
                 const direct = m.message_type === "direct";
-                const sender = authors.get(m.sender_id);
+                const sender = authors.get(normalizeUserId(m.sender_id));
                 const author = m.sender_id === currentUser.id ? "Ty" : (sender?.full_name || "Użytkownik");
                 const senderRole = sender ? roleLabel(sender.role) : "Nieznana rola";
                 return `<article class="chat-message ${m.sender_id===currentUser.id?"mine":""}">
@@ -1185,12 +1299,131 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
 
 
       } else if (currentView === "attendance") {
-        if(profile.role!=="supervisor"){shell("Obecności",`<div class="panel"><p>Historia obecności zostanie pokazana po przypisaniu Twojego konta do dziecka przez opiekuna.</p></div>`);return;}
-        const [members,meetings,rows]=await Promise.all([loadRows("members","full_name",true),loadRows("meetings","meeting_date",false),loadRows("attendance","marked_at",false)]);
-        shell("Obecności",`<div class="panel"><h2>Zaznacz obecność</h2>${!meetings.length||!members.length?"Najpierw zatwierdź konto członka MDP w zakładce „Zatwierdzanie kont” i utwórz zbiórkę.":`<form id="attendanceForm"><label>Zbiórka<select name="meeting_id" required>${meetings.map(m=>`<option value="${esc(m.id)}">${esc(m.title)} — ${esc(new Date(m.meeting_date).toLocaleString("pl-PL"))}</option>`).join("")}</select></label><label>Członek<select name="member_id" required>${members.map(m=>`<option value="${esc(m.id)}">${esc(m.full_name)}</option>`).join("")}</select></label><label>Status<select name="status"><option value="present">Obecny</option><option value="absent">Nieobecny</option><option value="late">Spóźniony</option></select></label><label>Uwagi<textarea name="notes" rows="2"></textarea></label><button class="primary">Zapisz obecność</button></form>`}</div><div class="panel"><h2>Ostatnie wpisy</h2>${rows.slice(0,30).map(r=>{const m=members.find(x=>x.id===r.member_id);const mt=meetings.find(x=>x.id===r.meeting_id);return `<article class="list-item"><strong>${esc(m?.full_name||"Członek")}</strong><p>${esc(mt?.title||"Zbiórka")} · ${({present:"Obecny",absent:"Nieobecny",late:"Spóźniony"})[r.status]}</p></article>`}).join("")||"<p>Brak wpisów.</p>"}</div>`);
-        const form=document.getElementById("attendanceForm");
-        if(form)form.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(form);const row={meeting_id:fd.get("meeting_id"),member_id:fd.get("member_id"),status:fd.get("status"),notes:fd.get("notes")||null,marked_by:currentUser.id,marked_at:new Date().toISOString()};const {error}=await supabaseClient.from("attendance").upsert(row,{onConflict:"meeting_id,member_id"});if(error)return toast("Nie zapisano obecności. Sprawdź uprawnienia.");toast("Obecność zapisana.");renderView();});
-      
+        if (profile.role !== "supervisor") {
+          shell("Obecności", `<div class="panel"><p>Historię obecności dziecka znajdziesz w zakładce „Obecności dziecka”.</p></div>`);
+          return;
+        }
+
+        const [members, meetings, rows] = await Promise.all([
+          loadRows("members", "full_name", true),
+          loadRows("meetings", "meeting_date", false),
+          loadRows("attendance", "marked_at", false)
+        ]);
+
+        const selectedMeetingId = window.mdpSelectedAttendanceMeeting || null;
+        const selectedMeeting = meetings.find(m => m.id === selectedMeetingId);
+        const statusLabels = { present: "Obecny", absent: "Nieobecny", late: "Spóźniony" };
+
+        if (selectedMeeting) {
+          const meetingRows = rows.filter(r => r.meeting_id === selectedMeeting.id);
+          const presentCount = meetingRows.filter(r => r.status === "present").length;
+          const absentCount = meetingRows.filter(r => r.status === "absent").length;
+          const lateCount = meetingRows.filter(r => r.status === "late").length;
+
+          shell("Obecności", `
+            <button type="button" class="secondary" id="attendanceBack">← Wszystkie zbiórki</button>
+            <div class="panel">
+              <h2>${esc(selectedMeeting.title || "Zbiórka")}</h2>
+              <p>${esc(new Date(selectedMeeting.meeting_date).toLocaleString("pl-PL"))}${selectedMeeting.location ? " · " + esc(selectedMeeting.location) : ""}</p>
+              <p><strong>Obecni:</strong> ${presentCount} · <strong>Nieobecni:</strong> ${absentCount} · <strong>Spóźnieni:</strong> ${lateCount}</p>
+            </div>
+            <form id="attendanceMeetingForm">
+              <div class="panel">
+                <h2>Lista członków</h2>
+                <p class="muted">Wybierz status każdej osoby. Możesz zapisać całą listę jednym przyciskiem.</p>
+                ${members.map(member => {
+                  const existing = meetingRows.find(r => r.member_id === member.id);
+                  return `<div class="list-item">
+                    <label><strong>${esc(member.full_name)}</strong>
+                      <select name="status_${esc(member.id)}">
+                        <option value="">— Nie oznaczono —</option>
+                        <option value="present" ${existing?.status === "present" ? "selected" : ""}>Obecny</option>
+                        <option value="absent" ${existing?.status === "absent" ? "selected" : ""}>Nieobecny</option>
+                        <option value="late" ${existing?.status === "late" ? "selected" : ""}>Spóźniony</option>
+                      </select>
+                    </label>
+                    ${existing?.notes ? `<small class="muted">Uwagi: ${esc(existing.notes)}</small>` : ""}
+                  </div>`;
+                }).join("") || "<p>Brak zatwierdzonych członków MDP.</p>"}
+              </div>
+              <button class="primary" type="submit">Zapisz obecności</button>
+            </form>
+          `);
+
+          document.getElementById("attendanceBack")?.addEventListener("click", () => {
+            window.mdpSelectedAttendanceMeeting = null;
+            renderView();
+          });
+
+          document.getElementById("attendanceMeetingForm")?.addEventListener("submit", async e => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            const timestamp = new Date().toISOString();
+            const updates = members
+              .map(member => ({
+                meeting_id: selectedMeeting.id,
+                member_id: member.id,
+                status: fd.get(`status_${member.id}`),
+                marked_by: currentUser.id,
+                marked_at: timestamp
+              }))
+              .filter(row => row.status);
+
+            if (!updates.length) return toast("Wybierz przynajmniej jeden status.");
+            const { error } = await supabaseClient
+              .from("attendance")
+              .upsert(updates, { onConflict: "meeting_id,member_id" });
+            if (error) {
+              console.error("Błąd zapisu obecności:", error);
+              return toast("Nie udało się zapisać obecności. Sprawdź uprawnienia.");
+            }
+            toast("Obecności zapisane.");
+            renderView();
+          });
+
+        } else {
+          window.mdpSelectedAttendanceMeeting = null;
+          const grouped = {};
+          meetings.forEach(meeting => {
+            const date = new Date(meeting.meeting_date);
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+            (grouped[key] ||= []).push(meeting);
+          });
+
+          shell("Obecności", `
+            <div class="panel">
+              <h2>Obecności według zbiórek</h2>
+              <p class="muted">Wybierz zbiórkę, aby zobaczyć listę członków i oznaczyć, kto był obecny, nieobecny lub się spóźnił.</p>
+            </div>
+            ${Object.keys(grouped).sort().reverse().map(key => {
+              const [year, month] = key.split("-");
+              const monthTitle = new Date(Number(year), Number(month) - 1, 1)
+                .toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
+              return `<div class="panel">
+                <h2>${esc(monthTitle.charAt(0).toUpperCase() + monthTitle.slice(1))}</h2>
+                ${grouped[key].sort((a, b) => new Date(b.meeting_date) - new Date(a.meeting_date)).map(meeting => {
+                  const meetingRows = rows.filter(r => r.meeting_id === meeting.id);
+                  const p = meetingRows.filter(r => r.status === "present").length;
+                  const a = meetingRows.filter(r => r.status === "absent").length;
+                  const l = meetingRows.filter(r => r.status === "late").length;
+                  return `<button type="button" class="list-item attendance-meeting-card" data-attendance-meeting="${esc(meeting.id)}">
+                    <strong>${esc(meeting.title || "Zbiórka")}</strong>
+                    <p>${esc(new Date(meeting.meeting_date).toLocaleString("pl-PL"))}${meeting.location ? " · " + esc(meeting.location) : ""}</p>
+                    <small>Obecni: ${p} · Nieobecni: ${a} · Spóźnieni: ${l}</small>
+                    <span>Otwórz listę →</span>
+                  </button>`;
+                }).join("")}
+              </div>`;
+            }).join("") || `<div class="panel"><p>Nie ma jeszcze żadnych zbiórek. Dodaj zbiórkę w zakładce „Zbiórki”, a pojawi się tutaj.</p></div>`}
+          `);
+
+          app.querySelectorAll("[data-attendance-meeting]").forEach(button => {
+            button.addEventListener("click", () => {
+              window.mdpSelectedAttendanceMeeting = button.dataset.attendanceMeeting;
+              renderView();
+            });
+          });
+        }
       } else if (currentView === "guardians") {
         if (profile.role !== "supervisor") {
           currentView = "home";
@@ -1302,7 +1535,7 @@ const { data, error } = await supabaseClient.functions.invoke("send-emergency", 
       <h2>Dane użytkownika</h2>
       <p><strong>Imię i nazwisko:</strong> ${esc(profile.full_name || "Nie podano")}</p>
       <p><strong>Rola:</strong> ${esc(profile.role || "Nieznana")}</p>
-      ${["member", "guardian"].includes(profile.role) ? '<button type="button" class="primary" id="enablePushButton">Włącz powiadomienia o zbiórkach</button><p class="muted">Otrzymasz zwykłe powiadomienia o zaplanowanych zbiórkach.</p>' : ''}
+      ${["supervisor", "member", "guardian"].includes(profile.role) ? '<button type="button" class="primary" id="enablePushButton">Włącz powiadomienia MDP</button><p class="muted">Otrzymasz powiadomienia o wiadomościach, nowych plikach i przypomnieniach o zbiórkach.</p>' : ''}
       <button type="button" id="logoutButton">Wyloguj się</button>
     </div>
   `);
